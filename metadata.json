@@ -1,0 +1,6 @@
+{
+  "name": "inaquired - Serverless Job Portal",
+  "description": "A serverless public job portal for remote, on-site, hybrid jobs and internships with real-time updates and a secure CMS admin panel.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

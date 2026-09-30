@@ -1,0 +1,64 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == "manmeet.msh@gmail.com" ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidJob(data) {
+      return data.title is string && data.title.size() >= 2 && data.title.size() <= 150
+        && data.slug is string && data.slug.size() >= 2 && data.slug.size() <= 180
+        && data.companyName is string && data.companyName.size() >= 2 && data.companyName.size() <= 120
+        && data.location is string && data.location.size() >= 2 && data.location.size() <= 120
+        && data.jobType in ['full-time', 'part-time', 'contract', 'internship']
+        && data.workArrangement in ['remote', 'on-site', 'hybrid']
+        && data.category is string && data.category.size() >= 2 && data.category.size() <= 60
+        && data.description is string && data.description.size() <= 15000
+        && data.status in ['published', 'draft', 'archived'];
+    }
+
+    match /jobs/{jobId} {
+      // Public visitors can get and list published jobs; Admins can view drafts/all
+      allow get: if resource.data.status == 'published' || isAdmin();
+      allow list: if resource.data.status == 'published' || isAdmin();
+      
+      // Only admins can create, update, delete jobs
+      allow create: if isAdmin() && isValidJob(request.resource.data);
+      allow update: if isAdmin() && isValidJob(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /admins/{adminId} {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+    }
+
+    match /subscribers/{subscriberId} {
+      // Allow browser clients to subscribe for job alerts
+      allow create: if request.resource.data.endpoint is string && request.resource.data.endpoint.size() <= 500;
+      allow read, update, delete: if isAdmin();
+    }
+
+    match /auditLogs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin();
+      allow update, delete: if false;
+    }
+  }
+}
