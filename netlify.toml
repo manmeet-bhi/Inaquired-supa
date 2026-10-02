@@ -1,0 +1,15 @@
+[build]
+  publish = "dist"
+  command = "npm run build"
+  SECRETS_SCAN_ENABLED = "false"
+
+[build.environment]
+  SECRETS_SCAN_ENABLED = "false"
+  SECRETS_SCAN_OMIT_PATHS = "dist/**"
+  SECRETS_SCAN_OMIT_KEYS = "VITE_SUPABASE_ANON_KEY,VITE_SUPABASE_URL,VITE_SUPABASE_STORAGE_URL,VITE_SUPABASE_STORAGE_BUCKET,VITE_SUPABASE_STORAGE_REGION,RESEND_API_KEY,SUPABASE_DIRECT_URL"
+
+# Handle client-side routing for Single Page Applications (SPA)
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
