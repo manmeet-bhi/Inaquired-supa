@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ThemeProvider } from './context/ThemeContext';
-import { AuthProvider, useAuth } from './context/AuthContext';
 import { Navbar } from './components/layout/Navbar';
 import { Footer } from './components/layout/Footer';
 import { HomePage } from './pages/HomePage';
@@ -10,21 +9,18 @@ import { AboutPage } from './pages/AboutPage';
 import { ContactPage } from './pages/ContactPage';
 import { PrivacyPolicyPage } from './pages/PrivacyPolicyPage';
 import { TermsPage } from './pages/TermsPage';
-import { AdminLoginPage } from './pages/admin/AdminLoginPage';
-import { AdminDashboard } from './pages/admin/AdminDashboard';
+import { DepartmentsPage } from './pages/DepartmentsPage';
+import { CompaniesPage } from './pages/CompaniesPage';
+import { AdminPage } from './pages/admin/AdminPage';
+import { AdminForgotPasswordPage } from './pages/admin/AdminForgotPasswordPage';
+import { AdminResetPasswordPage } from './pages/admin/AdminResetPasswordPage';
 import { Job } from './types/job';
 import { 
-  subscribeToPublishedJobs, 
-  subscribeToAllJobsForAdmin, 
-  seedInitialJobsIfEmpty 
+  subscribeToPublishedJobs 
 } from './services/jobService';
 import { triggerJobNotification } from './services/notificationService';
-import { INITIAL_JOBS } from './services/seedData';
 
 function MainApp() {
-  const { currentUser, isAdmin, isMfaVerified, loading: authLoading } = useAuth();
-  
-  // Navigation state (browser pathname simulation with popstate support)
   const [currentPath, setCurrentPath] = useState<string>(() => {
     if (typeof window !== 'undefined') {
       return window.location.pathname || '/';
@@ -37,7 +33,6 @@ function MainApp() {
   const [searchKeyword, setSearchKeyword] = useState<string>('');
   const previousJobsCountRef = useRef<number | null>(null);
 
-  // Synchronize browser history
   const navigate = (path: string) => {
     if (path !== currentPath) {
       window.history.pushState({}, '', path);
@@ -54,81 +49,37 @@ function MainApp() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  // Real-time Firestore subscription
+  // Real-time Supabase subscription for published jobs
   useEffect(() => {
     setLoadingJobs(true);
 
-    // Initial check to seed if Firestore is empty
-    seedInitialJobsIfEmpty().catch(() => {});
-
-    // If an admin is authenticated & MFA-verified, subscribe to all jobs (including drafts).
-    // Otherwise subscribe strictly to published jobs.
-    const unsubscribe = (isAdmin && isMfaVerified)
-      ? subscribeToAllJobsForAdmin((updatedJobs) => {
-          setJobs(updatedJobs);
-          setLoadingJobs(false);
-        })
-      : subscribeToPublishedJobs((publishedJobs) => {
-          // Detect new jobs added in real-time for notification triggers
-          if (previousJobsCountRef.current !== null && publishedJobs.length > previousJobsCountRef.current) {
-            const newestJob = publishedJobs[0];
-            if (newestJob) {
-              triggerJobNotification(newestJob);
-            }
+    const unsubscribe = subscribeToPublishedJobs(
+      (publishedJobs) => {
+        if (previousJobsCountRef.current !== null && publishedJobs.length > previousJobsCountRef.current) {
+          const newestJob = publishedJobs[0];
+          if (newestJob) {
+            triggerJobNotification(newestJob);
           }
-          previousJobsCountRef.current = publishedJobs.length;
-          
-          // If Firestore returned zero published jobs on first boot, load seed fallback
-          if (publishedJobs.length === 0 && !isAdmin) {
-            setJobs(INITIAL_JOBS.map((j, idx) => ({ id: `seed_${idx}`, ...j } as Job)));
-          } else {
-            setJobs(publishedJobs);
-          }
-          setLoadingJobs(false);
-        }, (err) => {
-          console.warn('Using client fallback jobs:', err);
-          setJobs(INITIAL_JOBS.map((j, idx) => ({ id: `seed_${idx}`, ...j } as Job)));
-          setLoadingJobs(false);
-        });
+        }
+        previousJobsCountRef.current = publishedJobs.length;
+        setJobs(publishedJobs);
+        setLoadingJobs(false);
+      },
+      (err) => {
+        console.error('Published jobs fetch error:', err);
+        setJobs([]);
+        setLoadingJobs(false);
+      }
+    );
 
     return () => unsubscribe();
-  }, [isAdmin, isMfaVerified]);
+  }, []);
 
-  // View job detail handler
   const handleSelectJob = (slugOrId: string) => {
     navigate(`/jobs/${slugOrId}`);
   };
 
-  // Route Rendering Logic
   const renderCurrentView = () => {
-    // Admin routes
-    if (currentPath === '/admin' || currentPath.startsWith('/admin/')) {
-      if (currentPath === '/admin/login') {
-        return (
-          <AdminLoginPage
-            onSuccess={() => navigate('/admin')}
-            onNavigateHome={() => navigate('/')}
-          />
-        );
-      }
-      if (!isAdmin || !isMfaVerified) {
-        return (
-          <AdminLoginPage
-            onSuccess={() => navigate('/admin')}
-            onNavigateHome={() => navigate('/')}
-          />
-        );
-      }
-      return (
-        <AdminDashboard
-          jobs={jobs}
-          onNavigateHome={() => navigate('/')}
-          onPreviewJob={handleSelectJob}
-        />
-      );
-    }
-
-    // Job Detail route: /jobs/:slug
     if (currentPath.startsWith('/jobs/')) {
       const slug = currentPath.replace('/jobs/', '');
       return (
@@ -140,7 +91,22 @@ function MainApp() {
       );
     }
 
-    // Public Category Routes
+    if (currentPath.startsWith('/category/')) {
+      const slug = currentPath.replace('/category/', '');
+      return (
+        <CategoryJobsPage
+          pageType="category"
+          categorySlug={slug}
+          jobs={jobs}
+          loading={loadingJobs}
+          onNavigate={navigate}
+          onSelectJob={handleSelectJob}
+          keyword={searchKeyword}
+          onKeywordChange={setSearchKeyword}
+        />
+      );
+    }
+
     if (currentPath === '/remote-jobs') {
       return (
         <CategoryJobsPage
@@ -197,10 +163,32 @@ function MainApp() {
       );
     }
 
-    if (currentPath === '/jobs') {
+    if (currentPath === '/departments' || currentPath === '/by-departments') {
+      return (
+        <DepartmentsPage
+          jobs={jobs}
+          onNavigate={navigate}
+          onSelectJob={handleSelectJob}
+        />
+      );
+    }
+
+    if (currentPath === '/companies' || currentPath === '/by-companies') {
+      return (
+        <CompaniesPage
+          jobs={jobs}
+          onNavigate={navigate}
+          onSelectJob={handleSelectJob}
+        />
+      );
+    }
+
+    if (currentPath.startsWith('/company/')) {
+      const companyParam = decodeURIComponent(currentPath.replace('/company/', ''));
       return (
         <CategoryJobsPage
-          pageType="all"
+          pageType="company"
+          companyName={companyParam}
           jobs={jobs}
           loading={loadingJobs}
           onNavigate={navigate}
@@ -211,7 +199,6 @@ function MainApp() {
       );
     }
 
-    // Content Pages
     if (currentPath === '/about') {
       return <AboutPage onNavigate={navigate} />;
     }
@@ -228,7 +215,6 @@ function MainApp() {
       return <TermsPage onNavigate={navigate} />;
     }
 
-    // Default Home Page (/)
     return (
       <HomePage
         jobs={jobs}
@@ -241,30 +227,44 @@ function MainApp() {
     );
   };
 
+  if (currentPath === '/admin/forgot-password' || currentPath.startsWith('/admin/forgot-password') || currentPath === '/admin/recovery') {
+    return <AdminForgotPasswordPage onNavigate={navigate} />;
+  }
+
+  if (currentPath === '/admin/reset-password' || currentPath.startsWith('/admin/reset-password')) {
+    return <AdminResetPasswordPage onNavigate={navigate} />;
+  }
+
+  if (currentPath === '/admin' || currentPath.startsWith('/admin')) {
+    return <AdminPage onNavigate={navigate} />;
+  }
+
   return (
-    <div className="flex min-h-screen flex-col bg-slate-50 text-slate-900 transition-colors duration-150 dark:bg-slate-950 dark:text-slate-100">
-      <Navbar 
-        currentPath={currentPath} 
-        onNavigate={navigate} 
+    <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 transition-colors duration-200">
+      <Navbar
+        currentPath={currentPath}
+        onNavigate={navigate}
         jobs={jobs}
         globalKeyword={searchKeyword}
         onSearchChange={setSearchKeyword}
         onSelectJob={handleSelectJob}
       />
+
       <main className="flex-1">
         {renderCurrentView()}
       </main>
+
       <Footer onNavigate={navigate} />
     </div>
   );
 }
 
-export default function App() {
+export function App() {
   return (
     <ThemeProvider>
-      <AuthProvider>
-        <MainApp />
-      </AuthProvider>
+      <MainApp />
     </ThemeProvider>
   );
 }
+
+export default App;

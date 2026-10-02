@@ -43,25 +43,6 @@ export interface JobFiltersState {
   sortBy: 'newest' | 'salary' | 'title';
 }
 
-export interface AdminUser {
-  uid: string;
-  email: string;
-  role: 'superadmin' | 'admin';
-  mfaEnabled: boolean;
-  mfaSecret?: string;
-  backupCodes?: string[];
-  createdAt: string;
-}
-
-export interface AuditLogEntry {
-  id: string;
-  adminId: string;
-  adminEmail: string;
-  action: string;
-  targetResource: string;
-  details: string;
-  timestamp: string;
-}
 
 export interface PushSubscriptionData {
   id: string;

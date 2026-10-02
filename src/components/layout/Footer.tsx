@@ -1,5 +1,5 @@
 import React from 'react';
-import { Briefcase, Shield, Globe, Heart } from 'lucide-react';
+import { Globe, Heart } from 'lucide-react';
 
 interface FooterProps {
   onNavigate: (path: string) => void;
@@ -14,12 +14,11 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
           {/* Brand Info */}
           <div className="md:col-span-1 space-y-4">
             <div className="flex items-center gap-2.5">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-white dark:bg-indigo-500">
-                <Briefcase className="h-4 w-4" />
-              </div>
-              <span className="text-lg font-bold tracking-tight text-slate-900 dark:text-white">
-                inaquired
-              </span>
+              <img 
+                src="/logo/logo.svg" 
+                alt="inaquired" 
+                className="site-logo h-7 w-auto object-contain" 
+              />
             </div>
             <p className="text-xs leading-relaxed text-slate-500 dark:text-slate-400">
               A transparent, serverless job portal connecting ambitious talent with verified remote, on-site, hybrid opportunities and paid internships.
@@ -120,13 +119,16 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
             <p className="mt-3 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
               inaquired maintains strict zero-spam standards. No registration is required for candidates.
             </p>
-            <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800">
+            <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-1.5 text-xs">
+              <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span>Verified & Protected</span>
+              </div>
               <button
                 onClick={() => onNavigate('/admin')}
-                className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 transition-colors"
+                className="text-[11px] font-semibold text-slate-400 hover:text-indigo-600 dark:text-slate-500 dark:hover:text-indigo-400 transition-colors"
               >
-                <Shield className="h-3.5 w-3.5" />
-                Staff CMS Portal
+                Admin Portal →
               </button>
             </div>
           </div>
@@ -134,7 +136,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
 
         {/* Bottom Bar */}
         <div className="mt-8 pt-6 border-t border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-400 dark:text-slate-500">
-          <p>© {new Date().getFullYear()} inaquired. All rights reserved. Serverless architecture powered by Firestore.</p>
+          <p>© {new Date().getFullYear()} inaquired. All rights reserved. Serverless architecture powered by Supabase & PostgreSQL.</p>
           <p className="flex items-center gap-1">
             Built for candidate transparency
           </p>

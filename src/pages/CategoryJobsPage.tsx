@@ -6,7 +6,9 @@ import { JobFilters } from '../components/jobs/JobFilters';
 import { filterJobs } from '../utils/jobUtils';
 
 interface CategoryJobsPageProps {
-  pageType: 'remote' | 'onsite' | 'hybrid' | 'internship' | 'all';
+  pageType: 'remote' | 'onsite' | 'hybrid' | 'internship' | 'all' | 'category' | 'company';
+  categorySlug?: string;
+  companyName?: string;
   jobs: Job[];
   loading: boolean;
   onNavigate: (path: string) => void;
@@ -17,6 +19,8 @@ interface CategoryJobsPageProps {
 
 export const CategoryJobsPage: React.FC<CategoryJobsPageProps> = ({
   pageType,
+  categorySlug = '',
+  companyName = '',
   jobs,
   loading,
   onNavigate,
@@ -24,11 +28,16 @@ export const CategoryJobsPage: React.FC<CategoryJobsPageProps> = ({
   keyword = '',
   onKeywordChange
 }) => {
+  const matchingCategory = categorySlug
+    ? jobs.find((j) => (j.category || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') === categorySlug)?.category ||
+      categorySlug.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+    : 'all';
+
   const getInitialFilters = (): JobFiltersState => {
     return {
       keyword: keyword || '',
       location: '',
-      category: 'all',
+      category: pageType === 'category' ? matchingCategory : 'all',
       workArrangement: pageType === 'remote' ? 'remote' : pageType === 'onsite' ? 'on-site' : pageType === 'hybrid' ? 'hybrid' : 'all',
       jobType: pageType === 'internship' ? 'internship' : 'all',
       experienceLevel: 'all',
@@ -40,7 +49,7 @@ export const CategoryJobsPage: React.FC<CategoryJobsPageProps> = ({
 
   useEffect(() => {
     setFilters(getInitialFilters());
-  }, [pageType]);
+  }, [pageType, categorySlug, companyName]);
 
   // Sync keyword when updated externally from Navbar
   useEffect(() => {
@@ -77,8 +86,20 @@ export const CategoryJobsPage: React.FC<CategoryJobsPageProps> = ({
       case 'internship':
         return {
           title: 'Internships & Co-op Openings',
-          description: 'Kickstart your career with paid summer and semester internships, mentorship programs, and entry-level pathways.',
+          description: 'Kickstart your career with paid summer and semester internships, mentorship programs, and early career opportunities.',
           badge: 'Paid Internships & Early Career',
+        };
+      case 'category':
+        return {
+          title: `${matchingCategory} Positions`,
+          description: `Explore all verified career opportunities in ${matchingCategory}. Direct employer applications with full salary transparency.`,
+          badge: `Department: ${matchingCategory}`,
+        };
+      case 'company':
+        return {
+          title: `Careers at ${companyName || 'Verified Employer'}`,
+          description: `Explore all verified career opportunities and direct application links at ${companyName || 'this company'}. Zero login wall.`,
+          badge: `Employer: ${companyName || 'Company'}`,
         };
       default:
         return {
@@ -91,7 +112,10 @@ export const CategoryJobsPage: React.FC<CategoryJobsPageProps> = ({
 
   const meta = getPageMeta();
   const categories = Array.from(new Set(jobs.map((j) => j.category).filter(Boolean)));
-  const filtered = filterJobs(jobs, filters);
+  const scopedJobs = pageType === 'company' && companyName 
+    ? jobs.filter((j) => (j.companyName || '').toLowerCase() === companyName.toLowerCase())
+    : jobs;
+  const filtered = filterJobs(scopedJobs, filters);
 
   return (
     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 sm:py-12 space-y-8">

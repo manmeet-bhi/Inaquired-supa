@@ -25,3 +25,10 @@
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* Site logo dark mode filter */
+[data-theme='dark'] .site-logo,
+.dark .site-logo {
+  filter: brightness(0) invert(1);
+}
+
+

@@ -21,12 +21,12 @@ export function formatSalary(min?: number, max?: number, currency: string = 'USD
   const symbol = currency === 'USD' ? '$' : currency === 'EUR' ? '€' : currency === 'GBP' ? '£' : `${currency} `;
   
   if (min && max) {
-    return `${symbol}${min.toLocaleString()} - ${symbol}${max.toLocaleString()} / yr`;
+    return `${symbol}${min.toLocaleString('en-US')} - ${symbol}${max.toLocaleString('en-US')} / yr`;
   }
   if (min) {
-    return `From ${symbol}${min.toLocaleString()} / yr`;
+    return `From ${symbol}${min.toLocaleString('en-US')} / yr`;
   }
-  return `Up to ${symbol}${max?.toLocaleString()} / yr`;
+  return `Up to ${symbol}${max?.toLocaleString('en-US')} / yr`;
 }
 
 /**
