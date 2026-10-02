@@ -1,24 +1,33 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, Suspense, lazy } from 'react';
 import { ThemeProvider } from './context/ThemeContext';
 import { Navbar } from './components/layout/Navbar';
 import { Footer } from './components/layout/Footer';
-import { HomePage } from './pages/HomePage';
-import { CategoryJobsPage } from './pages/CategoryJobsPage';
-import { JobDetailPage } from './pages/JobDetailPage';
-import { AboutPage } from './pages/AboutPage';
-import { ContactPage } from './pages/ContactPage';
-import { PrivacyPolicyPage } from './pages/PrivacyPolicyPage';
-import { TermsPage } from './pages/TermsPage';
-import { DepartmentsPage } from './pages/DepartmentsPage';
-import { CompaniesPage } from './pages/CompaniesPage';
-import { AdminPage } from './pages/admin/AdminPage';
-import { AdminForgotPasswordPage } from './pages/admin/AdminForgotPasswordPage';
-import { AdminResetPasswordPage } from './pages/admin/AdminResetPasswordPage';
 import { Job } from './types/job';
 import { 
   subscribeToPublishedJobs 
 } from './services/jobService';
 import { triggerJobNotification } from './services/notificationService';
+
+const HomePage = lazy(() => import('./pages/HomePage').then(m => ({ default: m.HomePage })));
+const CategoryJobsPage = lazy(() => import('./pages/CategoryJobsPage').then(m => ({ default: m.CategoryJobsPage })));
+const JobDetailPage = lazy(() => import('./pages/JobDetailPage').then(m => ({ default: m.JobDetailPage })));
+const AboutPage = lazy(() => import('./pages/AboutPage').then(m => ({ default: m.AboutPage })));
+const ContactPage = lazy(() => import('./pages/ContactPage').then(m => ({ default: m.ContactPage })));
+const PrivacyPolicyPage = lazy(() => import('./pages/PrivacyPolicyPage').then(m => ({ default: m.PrivacyPolicyPage })));
+const TermsPage = lazy(() => import('./pages/TermsPage').then(m => ({ default: m.TermsPage })));
+const DepartmentsPage = lazy(() => import('./pages/DepartmentsPage').then(m => ({ default: m.DepartmentsPage })));
+const CompaniesPage = lazy(() => import('./pages/CompaniesPage').then(m => ({ default: m.CompaniesPage })));
+const AdminPage = lazy(() => import('./pages/admin/AdminPage').then(m => ({ default: m.AdminPage })));
+const AdminForgotPasswordPage = lazy(() => import('./pages/admin/AdminForgotPasswordPage').then(m => ({ default: m.AdminForgotPasswordPage })));
+const AdminResetPasswordPage = lazy(() => import('./pages/admin/AdminResetPasswordPage').then(m => ({ default: m.AdminResetPasswordPage })));
+
+function PageLoader() {
+  return (
+    <div className="flex items-center justify-center min-h-[400px]">
+      <div className="w-8 h-8 border-3 border-blue-600/30 border-t-blue-600 rounded-full animate-spin" />
+    </div>
+  );
+}
 
 function MainApp() {
   const [currentPath, setCurrentPath] = useState<string>(() => {
@@ -228,15 +237,27 @@ function MainApp() {
   };
 
   if (currentPath === '/admin/forgot-password' || currentPath.startsWith('/admin/forgot-password') || currentPath === '/admin/recovery') {
-    return <AdminForgotPasswordPage onNavigate={navigate} />;
+    return (
+      <Suspense fallback={<PageLoader />}>
+        <AdminForgotPasswordPage onNavigate={navigate} />
+      </Suspense>
+    );
   }
 
   if (currentPath === '/admin/reset-password' || currentPath.startsWith('/admin/reset-password')) {
-    return <AdminResetPasswordPage onNavigate={navigate} />;
+    return (
+      <Suspense fallback={<PageLoader />}>
+        <AdminResetPasswordPage onNavigate={navigate} />
+      </Suspense>
+    );
   }
 
   if (currentPath === '/admin' || currentPath.startsWith('/admin')) {
-    return <AdminPage onNavigate={navigate} />;
+    return (
+      <Suspense fallback={<PageLoader />}>
+        <AdminPage onNavigate={navigate} />
+      </Suspense>
+    );
   }
 
   return (
@@ -251,7 +272,9 @@ function MainApp() {
       />
 
       <main className="flex-1">
-        {renderCurrentView()}
+        <Suspense fallback={<PageLoader />}>
+          {renderCurrentView()}
+        </Suspense>
       </main>
 
       <Footer onNavigate={navigate} />
