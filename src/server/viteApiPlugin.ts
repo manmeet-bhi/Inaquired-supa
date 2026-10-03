@@ -5,13 +5,76 @@ import {
   handleResetPassword,
   sendJsonResponse
 } from './recoveryApiHandlers.ts';
+import {
+  handleGet2FaStatus,
+  handleGenerateTotpSetup,
+  handleVerifyTotpSetup,
+  handleSendEmail2FaCode,
+  handleVerifyEmail2FaSetup,
+  handleVerifyLogin2Fa,
+  handleRegenerateBackupCodes,
+  handleGetBackupCodes,
+  handleDisable2Fa
+} from './twoFactorApiHandlers.ts';
+import {
+  handleRobotsTxt,
+  handleSitemapXml,
+  handleSeoSummary
+} from './seoHandlers.ts';
+import { getRedirectForPath } from '../services/redirectService.ts';
+import { generateMetadata, injectMetadataIntoHtml } from '../lib/seo/seoEngine.ts';
 
 export function viteAccountRecoveryPlugin(): Plugin {
   return {
     name: 'vite-account-recovery-plugin',
+    async transformIndexHtml(html, ctx) {
+      const url = ctx.originalUrl?.split('?')[0] || ctx.path || '/';
+      if (url.startsWith('/admin') || url.startsWith('/api') || url.startsWith('/@')) {
+        return html;
+      }
+      try {
+        const anyCtx = ctx as any;
+        const host = anyCtx.req?.headers?.host || 'localhost:3000';
+        const proto = anyCtx.req?.headers?.['x-forwarded-proto'] || (host.includes('localhost') ? 'http' : 'https');
+        const origin = `${proto}://${host}`;
+        const meta = await generateMetadata(url, origin);
+        return injectMetadataIntoHtml(html, meta);
+      } catch (err) {
+        console.warn('[Vite SEO Engine] Error injecting server metadata:', err);
+        return html;
+      }
+    },
     configureServer(server) {
       server.middlewares.use(async (req, res, next) => {
         const url = req.url?.split('?')[0];
+
+        // 301 / 308 Permanent SEO Redirect Interception
+        if (url && (req.method === 'GET' || req.method === 'HEAD') && !url.startsWith('/api') && !url.startsWith('/@') && !url.includes('.')) {
+          try {
+            const redir = await getRedirectForPath(url);
+            if (redir) {
+              res.statusCode = redir.status;
+              res.setHeader('Location', redir.destination);
+              res.end();
+              return;
+            }
+          } catch (e) {
+            // Ignore redirect lookup errors and proceed
+          }
+        }
+
+        // SEO and Crawler Endpoints
+        if ((url === '/robots.txt') && (req.method === 'GET' || req.method === 'HEAD')) {
+          return handleRobotsTxt(req, res);
+        }
+
+        if ((url === '/sitemap.xml') && (req.method === 'GET' || req.method === 'HEAD')) {
+          return handleSitemapXml(req, res);
+        }
+
+        if (url === '/api/seo/summary' && req.method === 'GET') {
+          return handleSeoSummary(req, res);
+        }
 
         if (req.method === 'OPTIONS') {
           res.setHeader('Access-Control-Allow-Origin', '*');
@@ -22,6 +85,7 @@ export function viteAccountRecoveryPlugin(): Plugin {
           return;
         }
 
+        // Account Recovery
         if (url === '/api/auth/forgot-password' && req.method === 'POST') {
           return handleForgotPassword(req, res);
         }
@@ -34,13 +98,50 @@ export function viteAccountRecoveryPlugin(): Plugin {
           return handleResetPassword(req, res);
         }
 
+        // Two-Factor Authentication (2FA) Endpoints
+        if (url === '/api/auth/2fa/status' && req.method === 'POST') {
+          return handleGet2FaStatus(req, res);
+        }
+
+        if (url === '/api/auth/2fa/generate-secret' && req.method === 'POST') {
+          return handleGenerateTotpSetup(req, res);
+        }
+
+        if (url === '/api/auth/2fa/verify-setup' && req.method === 'POST') {
+          return handleVerifyTotpSetup(req, res);
+        }
+
+        if (url === '/api/auth/2fa/send-email-code' && req.method === 'POST') {
+          return handleSendEmail2FaCode(req, res);
+        }
+
+        if (url === '/api/auth/2fa/verify-email-setup' && req.method === 'POST') {
+          return handleVerifyEmail2FaSetup(req, res);
+        }
+
+        if (url === '/api/auth/2fa/verify-login-2fa' && req.method === 'POST') {
+          return handleVerifyLogin2Fa(req, res);
+        }
+
+        if (url === '/api/auth/2fa/regenerate-backup-codes' && req.method === 'POST') {
+          return handleRegenerateBackupCodes(req, res);
+        }
+
+        if (url === '/api/auth/2fa/get-backup-codes' && req.method === 'POST') {
+          return handleGetBackupCodes(req, res);
+        }
+
+        if (url === '/api/auth/2fa/disable' && req.method === 'POST') {
+          return handleDisable2Fa(req, res);
+        }
+
         if (url === '/api/auth/health' && req.method === 'GET') {
           const hasApiKey = Boolean(process.env.RESEND_API_KEY && process.env.RESEND_API_KEY.startsWith('re_'));
           return sendJsonResponse(res, 200, {
             status: 'ok',
-            service: 'inaquired-auth-recovery',
+            service: 'inaquired-auth-recovery-2fa',
             resendConfigured: hasApiKey,
-            fromEmail: process.env.RESEND_FROM_EMAIL || 'inaquired <onboarding@resend.dev>'
+            fromEmail: process.env.RESEND_FROM_EMAIL || 'inaquired <noreply@noreply.anywhereroles.in>'
           });
         }
 

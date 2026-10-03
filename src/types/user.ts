@@ -23,6 +23,7 @@ export interface CreateUserData {
 
 export interface UpdateUserData {
   fullName?: string;
+  email?: string;
   role?: UserRole;
   status?: UserStatus;
   password?: string;

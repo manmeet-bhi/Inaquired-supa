@@ -4,16 +4,25 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const { Client } = pg;
-const uri = 'postgresql://postgres.wnpsrdtlqxfiglhmalwq:aXihkgIxLsig4svi@aws-0-ap-northeast-1.pooler.supabase.com:6543/postgres';
+const uri = process.env.SUPABASE_DIRECT_URL || process.env.DATABASE_URL;
 
-const ADMIN_EMAIL = 'admin@inaquired.app';
-const ADMIN_PASSWORD = 'AdminPassword123!';
+if (!uri) {
+  console.error('[CRITICAL] Missing SUPABASE_DIRECT_URL or DATABASE_URL in environment variables.');
+  process.exit(1);
+}
+
+const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || '').trim().toLowerCase();
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
+
+if (!ADMIN_EMAIL || !ADMIN_PASSWORD) {
+  throw new Error('[CRITICAL] Set ADMIN_EMAIL and ADMIN_PASSWORD before provisioning an administrator.');
+}
 
 async function createAdmin() {
   console.log(`Creating Admin user in Supabase Postgres...`);
   const client = new Client({
     connectionString: uri,
-    ssl: { rejectUnauthorized: false }
+    ssl: { rejectUnauthorized: true }
   });
   await client.connect();
 
@@ -34,72 +43,38 @@ async function createAdmin() {
       console.log('Password updated successfully.');
     } else {
       console.log(`Inserting new admin user ${ADMIN_EMAIL}...`);
-      const insertQuery = `
-        DO $$
-        DECLARE
-          new_id uuid := gen_random_uuid();
-          user_email text := '${ADMIN_EMAIL}';
-          user_pass text := '${ADMIN_PASSWORD}';
-          enc_pass text;
-        BEGIN
-          enc_pass := extensions.crypt(user_pass, extensions.gen_salt('bf'));
+      
+      const newIdRes = await client.query('SELECT gen_random_uuid() as id, extensions.crypt($1, extensions.gen_salt(\'bf\')) as enc_pass', [ADMIN_PASSWORD]);
+      const newId = newIdRes.rows[0].id;
+      const encPass = newIdRes.rows[0].enc_pass;
 
-          INSERT INTO auth.users (
-            instance_id,
-            id,
-            aud,
-            role,
-            email,
-            encrypted_password,
-            email_confirmed_at,
-            raw_app_meta_data,
-            raw_user_meta_data,
-            created_at,
-            updated_at,
-            confirmation_token,
-            recovery_token,
-            email_change_token_new,
-            email_change
-          ) VALUES (
-            '00000000-0000-0000-0000-000000000000',
-            new_id,
-            'authenticated',
-            'authenticated',
-            user_email,
-            enc_pass,
-            NOW(),
-            '{"provider":"email","providers":["email"]}'::jsonb,
-            '{"role":"admin"}'::jsonb,
-            NOW(),
-            NOW(),
-            '',
-            '',
-            '',
-            ''
-          );
+      await client.query(`
+        INSERT INTO auth.users (
+          instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
+          raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
+          confirmation_token, recovery_token, email_change_token_new, email_change
+        ) VALUES (
+          '00000000-0000-0000-0000-000000000000', $1, 'authenticated', 'authenticated',
+          $2, $3, NOW(), '{"provider":"email","providers":["email"]}'::jsonb,
+          '{"role":"admin"}'::jsonb, NOW(), NOW(), '', '', '', ''
+        );
+      `, [newId, ADMIN_EMAIL, encPass]);
 
-          INSERT INTO auth.identities (
-            id,
-            user_id,
-            provider_id,
-            identity_data,
-            provider,
-            last_sign_in_at,
-            created_at,
-            updated_at
-          ) VALUES (
-            new_id,
-            new_id,
-            new_id::text,
-            json_build_object('sub', new_id::text, 'email', user_email)::jsonb,
-            'email',
-            NOW(),
-            NOW(),
-            NOW()
-          );
-        END $$;
-      `;
-      await client.query(insertQuery);
+      await client.query(`
+        INSERT INTO auth.identities (
+          id, user_id, provider_id, identity_data, provider, last_sign_in_at, created_at, updated_at
+        ) VALUES (
+          $1, $1, $1::text, json_build_object('sub', $1::text, 'email', $2::text)::jsonb,
+          'email', NOW(), NOW(), NOW()
+        );
+      `, [newId, ADMIN_EMAIL]);
+
+      await client.query(`
+        INSERT INTO public.admin_users (id, email, full_name, role, status, created_at, updated_at)
+        VALUES ($1, $2, 'Primary Administrator', 'superadmin', 'active', NOW(), NOW())
+        ON CONFLICT (id) DO NOTHING;
+      `, [newId, ADMIN_EMAIL]);
+
       console.log('Inserted admin user and identity successfully.');
     }
   } finally {

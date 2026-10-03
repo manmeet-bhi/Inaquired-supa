@@ -9,12 +9,12 @@ dotenv.config();
 const { Client } = pg;
 
 // Supabase credentials
-const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://wnpsrdtlqxfiglhmalwq.supabase.co';
-const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_n2im84IXBbQ3v2XluipN6Q_N_gfjbhu';
+const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// Direct DB connection string fallback
-const directDbUri = process.env.SUPABASE_DIRECT_URL || 'postgresql://postgres:aXihkgIxLsig4svi@db.wnpsrdtlqxfiglhmalwq.supabase.co:5432/postgres';
+// Direct DB connection string fallback - strictly from environment variables
+const directDbUri = process.env.SUPABASE_DIRECT_URL || '';
 
 /**
  * Execute RPC function via Supabase JS client or direct Postgres connection
@@ -37,7 +37,7 @@ async function callDbRpc(procedureName: string, params: Record<string, any>): Pr
   console.log(`[DB Fallback] Executing ${procedureName} via direct PostgreSQL connection...`);
   const client = new Client({
     connectionString: directDbUri,
-    ssl: { rejectUnauthorized: false },
+    ssl: { rejectUnauthorized: true },
     connectionTimeoutMillis: 10000,
   });
 
@@ -124,9 +124,35 @@ export async function handleForgotPassword(req: any, res: any) {
       });
     }
 
-    // Generate cryptographically secure token & 6-digit OTP code
+    let appOrigin: string;
+    if (process.env.APP_URL) {
+      try {
+        const configuredUrl = new URL(process.env.APP_URL);
+        if (
+          !['https:', 'http:'].includes(configuredUrl.protocol) ||
+          (process.env.NODE_ENV !== 'development' && configuredUrl.protocol !== 'https:')
+        ) {
+          throw new Error('APP_URL must use HTTPS outside development.');
+        }
+        appOrigin = configuredUrl.origin;
+      } catch {
+        return sendJsonResponse(res, 500, {
+          success: false,
+          error: 'Password recovery is temporarily unavailable.'
+        });
+      }
+    } else if (process.env.NODE_ENV === 'development') {
+      appOrigin = 'http://localhost:3000';
+    } else {
+      return sendJsonResponse(res, 500, {
+        success: false,
+        error: 'Password recovery is temporarily unavailable.'
+      });
+    }
+
+    // Generate cryptographically secure token & 6-digit OTP code using crypto
     const token = crypto.randomBytes(32).toString('hex');
-    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpCode = crypto.randomInt(100000, 1000000).toString();
 
     // Call stored procedure
     const result = await callDbRpc('admin_request_password_reset', {
@@ -138,17 +164,13 @@ export async function handleForgotPassword(req: any, res: any) {
     });
 
     if (!result || !result.exists) {
-      return sendJsonResponse(res, 404, {
-        success: false,
-        error: 'No administrative account found with that email address. Please verify your address or contact your administrator.'
+      return sendJsonResponse(res, 200, {
+        success: true,
+        message: 'If an administrator account exists for this address, recovery instructions will be sent.'
       });
     }
 
-    // Compute app URL
-    const appUrl = (process.env.APP_URL || '').replace(/\/$/, '') ||
-      (req.headers.origin ? req.headers.origin.replace(/\/$/, '') : 'http://localhost:3000');
-
-    const resetUrl = `${appUrl}/admin/reset-password?token=${token}&email=${encodeURIComponent(email)}`;
+    const resetUrl = `${appOrigin}/admin/reset-password?token=${token}&email=${encodeURIComponent(email)}`;
 
     // Dispatch email using Resend
     const sendResult = await sendPasswordResetEmail({
@@ -160,19 +182,16 @@ export async function handleForgotPassword(req: any, res: any) {
     });
 
     if (sendResult.mode === 'resend_live' && !sendResult.success) {
-      return sendJsonResponse(res, 502, {
-        success: false,
-        error: `Resend error: ${sendResult.error}. Please verify the sender domain in your Resend dashboard.`,
-        details: sendResult.error
-      });
+      console.error('[Forgot Password Email Delivery Error]', sendResult.error);
     }
 
+    const isDev = process.env.NODE_ENV === 'development';
     return sendJsonResponse(res, 200, {
       success: true,
-      message: `A password recovery email has been sent to ${email} via Resend. Please check your inbox.`,
-      mode: sendResult.mode,
-      devOtp: sendResult.mode === 'dev_fallback' ? sendResult.devOtp : undefined,
-      previewUrl: sendResult.mode === 'dev_fallback' ? sendResult.previewUrl : undefined
+      message: 'If an administrator account exists for this address, recovery instructions will be sent.',
+      mode: isDev ? sendResult.mode : undefined,
+      devOtp: isDev && sendResult.mode === 'dev_fallback' ? sendResult.devOtp : undefined,
+      previewUrl: isDev && sendResult.mode === 'dev_fallback' ? sendResult.previewUrl : undefined
     });
 
   } catch (err: any) {

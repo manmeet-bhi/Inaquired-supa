@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, MapPin, SlidersHorizontal, RotateCcw } from 'lucide-react';
+import { Search, MapPin, SlidersHorizontal, RotateCcw, X } from 'lucide-react';
 import { JobFiltersState, WorkArrangement, JobType, ExperienceLevel } from '../../types/job';
 
 interface JobFiltersProps {
@@ -69,8 +69,18 @@ export const JobFilters: React.FC<JobFiltersProps> = ({
             placeholder="Search by job title, skill, or keyword..."
             value={filters.keyword}
             onChange={(e) => updateField('keyword', e.target.value)}
-            className="w-full rounded-lg border border-slate-200 bg-slate-50/50 py-2.5 pl-10 pr-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-800/60 dark:text-white dark:placeholder:text-slate-500"
+            className="w-full rounded-lg border border-slate-200 bg-slate-50/50 py-2.5 pl-10 pr-8 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-800/60 dark:text-white dark:placeholder:text-slate-500"
           />
+          {filters.keyword && (
+            <button
+              type="button"
+              onClick={() => updateField('keyword', '')}
+              className="absolute right-2.5 top-3 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+              aria-label="Clear keyword filter"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
         </div>
 
         <div className="relative sm:col-span-1 lg:col-span-4">
@@ -80,8 +90,18 @@ export const JobFilters: React.FC<JobFiltersProps> = ({
             placeholder="City, state, or 'Remote'..."
             value={filters.location}
             onChange={(e) => updateField('location', e.target.value)}
-            className="w-full rounded-lg border border-slate-200 bg-slate-50/50 py-2.5 pl-10 pr-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-800/60 dark:text-white dark:placeholder:text-slate-500"
+            className="w-full rounded-lg border border-slate-200 bg-slate-50/50 py-2.5 pl-10 pr-8 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-800/60 dark:text-white dark:placeholder:text-slate-500"
           />
+          {filters.location && (
+            <button
+              type="button"
+              onClick={() => updateField('location', '')}
+              className="absolute right-2.5 top-3 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+              aria-label="Clear location filter"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
         </div>
 
         <div className="lg:col-span-3 flex items-center gap-2">
@@ -182,10 +202,6 @@ export const JobFilters: React.FC<JobFiltersProps> = ({
       <div className="flex items-center justify-between pt-1 text-xs text-slate-500 dark:text-slate-400">
         <span>
           Showing <strong className="text-slate-800 dark:text-slate-200">{totalResults}</strong> job opportunities
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
-          <span>Live Firestore Sync</span>
         </span>
       </div>
     </div>

@@ -8,21 +8,22 @@ dotenv.config();
 
 const { Client } = pg;
 
-// Potential connection URIs to test
-const DIRECT_URL_1 = process.env.DATABASE_URL || 'postgresql://postgres:aXihkgIxLsig4svi@db.wnpsrdtlqxfiglhmalwq.supabase.co:5432/postgres';
-const DIRECT_URL_2 = 'postgresql://postgres:[aXihkgIxLsig4svi]@db.wnpsrdtlqxfiglhmalwq.supabase.co:5432/postgres';
-const POOLER_URL = 'postgresql://postgres:aXihkgIxLsig4svi@db.wnpsrdtlqxfiglhmalwq.supabase.co:6543/postgres';
+// Database connection URI from environment
+const DB_URL = process.env.SUPABASE_DIRECT_URL || process.env.DATABASE_URL;
+
+if (!DB_URL) {
+  console.error('[CRITICAL] Missing SUPABASE_DIRECT_URL or DATABASE_URL in environment.');
+  process.exit(1);
+}
 
 async function getConnectedClient(): Promise<pg.Client> {
   const candidates = [
-    { name: 'Direct Port 5432', uri: DIRECT_URL_1 },
-    { name: 'Connection Pooler Port 6543', uri: POOLER_URL },
-    { name: 'Direct with Brackets', uri: DIRECT_URL_2 }
+    { name: 'Primary Database Connection', uri: DB_URL },
   ];
 
   for (const candidate of candidates) {
     console.log(`Attempting connection via ${candidate.name}...`);
-    const client = new Client({
+    let client = new Client({
       connectionString: candidate.uri,
       ssl: { rejectUnauthorized: false },
       connectionTimeoutMillis: 10000,
@@ -63,10 +64,10 @@ async function runMigrations() {
 
     // 2. Fetch already applied migrations
     const { rows: appliedRows } = await client.query(`
-      SELECT version, name, applied_at FROM public.schema_migrations ORDER BY version ASC;
+      SELECT version, name, checksum, applied_at FROM public.schema_migrations ORDER BY version ASC;
     `);
-    const appliedVersions = new Set(appliedRows.map((r: any) => r.version));
-    console.log(`Found ${appliedVersions.size} previously applied migration(s).`);
+    const appliedMap = new Map(appliedRows.map((r: any) => [r.version, r]));
+    console.log(`Found ${appliedMap.size} previously recorded migration(s) in database.`);
 
     // 3. Scan migrations directory
     const migrationsDir = path.resolve(process.cwd(), 'supabase/migrations');
@@ -78,18 +79,28 @@ async function runMigrations() {
       .filter(f => f.endsWith('.sql'))
       .sort();
 
-    console.log(`Found ${files.length} migration file(s) in supabase/migrations/`);
+    console.log(`Found ${files.length} production migration file(s) in supabase/migrations/`);
 
+    const activeVersions = new Set<string>();
     let appliedCount = 0;
 
     for (const file of files) {
       const version = file.split('_')[0];
+      activeVersions.add(version);
       const filePath = path.join(migrationsDir, file);
       const sql = fs.readFileSync(filePath, 'utf8');
       const checksum = crypto.createHash('sha256').update(sql).digest('hex');
 
-      if (appliedVersions.has(version)) {
-        console.log(`  [SKIP] ${file} (already applied)`);
+      const existing: any = appliedMap.get(version);
+      const isForce = process.argv.includes('--force');
+
+      if (existing && !isForce) {
+        if (existing.name !== file || existing.checksum !== checksum) {
+          throw new Error(
+            `Migration ${version} differs from its recorded file/checksum. Refusing to reapply it; add a new migration or review explicitly with --force.`
+          );
+        }
+        console.log(`  [SKIP] ${file} (already up-to-date)`);
         continue;
       }
 
@@ -101,7 +112,8 @@ async function runMigrations() {
         await client.query(`
           INSERT INTO public.schema_migrations (version, name, checksum, applied_at)
           VALUES ($1, $2, $3, NOW())
-          ON CONFLICT (version) DO UPDATE SET checksum = EXCLUDED.checksum, applied_at = NOW();
+          ON CONFLICT (version) DO UPDATE 
+          SET name = EXCLUDED.name, checksum = EXCLUDED.checksum, applied_at = NOW();
         `, [version, file, checksum]);
         await client.query('COMMIT');
 
@@ -111,6 +123,16 @@ async function runMigrations() {
         await client.query('ROLLBACK');
         console.error(`  [FAILED] Error applying ${file}:`, migrationErr.message);
         throw migrationErr;
+      }
+    }
+
+    // Clean up any historical pre-merge orphaned migration records
+    const orphaned = appliedRows.filter((r: any) => !activeVersions.has(r.version));
+    if (orphaned.length > 0) {
+      console.log(`\nPruning ${orphaned.length} legacy pre-merge tracking record(s) from schema_migrations...`);
+      for (const o of orphaned) {
+        await client.query('DELETE FROM public.schema_migrations WHERE version = $1', [o.version]);
+        console.log(`  • Removed legacy record version ${o.version} (${o.name})`);
       }
     }
 

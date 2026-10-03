@@ -117,7 +117,7 @@ export const AdminForgotPasswordPage: React.FC<AdminForgotPasswordPageProps> = (
               </h1>
               <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 max-w-xs mx-auto">
                 {successInfo 
-                  ? 'Follow instructions sent to your email to restore access.'
+                  ? 'If an administrator account matches that address, recovery instructions are on the way.'
                   : 'Enter your administrator email to receive a password reset link and verification code.'}
               </p>
             </div>
@@ -139,10 +139,10 @@ export const AdminForgotPasswordPage: React.FC<AdminForgotPasswordPageProps> = (
                   <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
                   <div className="space-y-1 text-xs">
                     <p className="font-semibold text-emerald-900 dark:text-emerald-200">
-                      Recovery Instructions Sent
+                      Check Your Inbox
                     </p>
                     <p className="text-emerald-700 dark:text-emerald-300">
-                      We've dispatched an email via <strong>Resend</strong> to:
+                      If an administrator account matches this address, recovery instructions will be sent to:
                     </p>
                     <p className="font-mono font-medium text-emerald-800 dark:text-emerald-200 bg-white/70 dark:bg-emerald-900/40 px-2 py-0.5 rounded border border-emerald-200/50 dark:border-emerald-800/50 inline-block">
                       {email}
@@ -150,23 +150,6 @@ export const AdminForgotPasswordPage: React.FC<AdminForgotPasswordPageProps> = (
                   </div>
                 </div>
               </div>
-
-              {/* Dev mode helper banner */}
-              {successInfo.devOtp && (
-                <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-3.5 dark:border-amber-900/50 dark:bg-amber-950/40 text-xs">
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className="font-semibold text-amber-900 dark:text-amber-200">
-                      🛠️ Dev Code Preview:
-                    </span>
-                    <span className="font-mono text-base font-extrabold tracking-widest text-amber-800 dark:text-amber-300 bg-white dark:bg-amber-900/60 px-2.5 py-0.5 rounded border border-amber-300">
-                      {successInfo.devOtp}
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-amber-700 dark:text-amber-300">
-                    Set <code className="bg-amber-100 dark:bg-amber-900/80 px-1 py-0.2 rounded font-mono">RESEND_API_KEY</code> in <code className="font-mono">.env</code> to deliver live emails.
-                  </p>
-                </div>
-              )}
 
               {/* Action Buttons */}
               <div className="space-y-2.5 pt-2">
@@ -209,24 +192,6 @@ export const AdminForgotPasswordPage: React.FC<AdminForgotPasswordPageProps> = (
             /* Email Input Form */
             <form onSubmit={handleSubmit} className="mt-6 space-y-4">
               
-              {/* Default Admin Quick-fill */}
-              <div className="rounded-xl border border-indigo-100 bg-indigo-50/70 p-3 dark:border-indigo-900/40 dark:bg-indigo-950/40 flex items-center justify-between text-xs">
-                <div className="space-y-0.5">
-                  <p className="font-semibold text-indigo-900 dark:text-indigo-200">Registered Admin</p>
-                  <p className="text-[11px] text-indigo-700 dark:text-indigo-300 font-mono">admin@inaquired.app</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEmail('admin@inaquired.app');
-                    setErrorMessage(null);
-                  }}
-                  className="rounded-lg bg-indigo-600 px-2.5 py-1.5 text-[11px] font-semibold text-white hover:bg-indigo-500 shadow-sm transition-colors"
-                >
-                  Auto-fill
-                </button>
-              </div>
-
               {/* Email Field */}
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
@@ -240,7 +205,7 @@ export const AdminForgotPasswordPage: React.FC<AdminForgotPasswordPageProps> = (
                     autoFocus
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="admin@inaquired.app"
+                    placeholder="admin@example.com"
                     className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-3 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100"
                   />
                 </div>

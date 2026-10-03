@@ -5,13 +5,20 @@ import { buildPasswordResetHtml, sendPasswordResetEmail } from '../src/server/re
 
 dotenv.config();
 
-const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://wnpsrdtlqxfiglhmalwq.supabase.co';
-const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_n2im84IXBbQ3v2XluipN6Q_N_gfjbhu';
+const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+if (!supabaseKey) {
+  throw new Error('Set SUPABASE_SERVICE_ROLE_KEY before running this privileged recovery test.');
+}
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-const TEST_EMAIL = 'admin@inaquired.app';
-const ORIGINAL_PASSWORD = 'AdminPassword123!';
-const TEMPORARY_NEW_PASSWORD = 'NewAdminPassword456!';
+const TEST_EMAIL = process.env.TEST_ADMIN_EMAIL || '';
+const ORIGINAL_PASSWORD = process.env.TEST_ADMIN_PASSWORD || '';
+const TEMPORARY_NEW_PASSWORD = process.env.TEST_ADMIN_NEW_PASSWORD || '';
+
+if (!TEST_EMAIL || !ORIGINAL_PASSWORD || !TEMPORARY_NEW_PASSWORD) {
+  throw new Error('Set TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD, and TEST_ADMIN_NEW_PASSWORD before running this test.');
+}
 
 async function runRecoveryVerification() {
   console.log('====================================================');
@@ -56,7 +63,7 @@ async function runRecoveryVerification() {
   // 3. Test Database RPC: admin_request_password_reset
   console.log('\n3. Testing Database RPC: admin_request_password_reset...');
   const actualToken = crypto.randomBytes(32).toString('hex');
-  const actualOtp = Math.floor(100000 + Math.random() * 900000).toString();
+  const actualOtp = crypto.randomInt(100000, 1000000).toString();
 
   const { data: requestData, error: reqErr } = await supabase.rpc('admin_request_password_reset', {
     p_email: TEST_EMAIL,

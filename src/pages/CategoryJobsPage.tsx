@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Briefcase, ArrowLeft, Filter, Sparkles } from 'lucide-react';
+import { FolderSearch, ArrowLeft, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react';
 import { Job, JobFiltersState } from '../types/job';
 import { JobCard } from '../components/jobs/JobCard';
 import { JobFilters } from '../components/jobs/JobFilters';
@@ -46,18 +46,23 @@ export const CategoryJobsPage: React.FC<CategoryJobsPageProps> = ({
   };
 
   const [filters, setFilters] = useState<JobFiltersState>(getInitialFilters());
+  const [currentPage, setCurrentPage] = useState(1);
+  const JOBS_PER_PAGE = 12;
 
   useEffect(() => {
     setFilters(getInitialFilters());
+    setCurrentPage(1);
   }, [pageType, categorySlug, companyName]);
 
   // Sync keyword when updated externally from Navbar
   useEffect(() => {
     setFilters((prev) => (prev.keyword !== keyword ? { ...prev, keyword } : prev));
+    setCurrentPage(1);
   }, [keyword]);
 
   const handleFilterUpdate = (newFilters: JobFiltersState) => {
     setFilters(newFilters);
+    setCurrentPage(1);
     if (onKeywordChange && newFilters.keyword !== keyword) {
       onKeywordChange(newFilters.keyword);
     }
@@ -117,19 +122,15 @@ export const CategoryJobsPage: React.FC<CategoryJobsPageProps> = ({
     : jobs;
   const filtered = filterJobs(scopedJobs, filters);
 
+  // Pagination
+  const totalPages = Math.ceil(filtered.length / JOBS_PER_PAGE);
+  const paginatedJobs = filtered.slice((currentPage - 1) * JOBS_PER_PAGE, currentPage * JOBS_PER_PAGE);
+
   return (
     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 sm:py-12 space-y-8">
       
-      {/* Back button & Page Header */}
+      {/* Page Header */}
       <div>
-        <button
-          onClick={() => onNavigate('/')}
-          className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 mb-4 transition-colors"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" />
-          <span>Back to Home</span>
-        </button>
-
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <span className="inline-flex items-center gap-1 rounded-md bg-indigo-50 px-2.5 py-0.5 text-xs font-medium text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
@@ -166,7 +167,7 @@ export const CategoryJobsPage: React.FC<CategoryJobsPageProps> = ({
         </div>
       ) : filtered.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-slate-300 p-12 text-center dark:border-slate-800 bg-white dark:bg-slate-900/40">
-          <Briefcase className="mx-auto h-12 w-12 text-slate-400 mb-3" />
+          <FolderSearch className="mx-auto h-12 w-12 text-slate-400 mb-3" />
           <h3 className="text-base font-bold text-slate-800 dark:text-white">
             No openings found for this category
           </h3>
@@ -181,11 +182,58 @@ export const CategoryJobsPage: React.FC<CategoryJobsPageProps> = ({
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {filtered.map((job) => (
-            <JobCard key={job.id} job={job} onClick={onSelectJob} />
-          ))}
-        </div>
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {paginatedJobs.map((job) => (
+              <JobCard key={job.id} job={job} onClick={onSelectJob} />
+            ))}
+          </div>
+
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between pt-4 border-t border-slate-200 dark:border-slate-800">
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Page <strong className="text-slate-800 dark:text-slate-200">{currentPage}</strong> of{' '}
+                <strong className="text-slate-800 dark:text-slate-200">{totalPages}</strong>{' '}·{' '}
+                <strong className="text-slate-800 dark:text-slate-200">{filtered.length}</strong> results
+              </p>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => { setCurrentPage(p => Math.max(1, p - 1)); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                  disabled={currentPage === 1}
+                  className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 transition-colors"
+                >
+                  <ChevronLeft className="h-3.5 w-3.5" />
+                  Prev
+                </button>
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  const page = totalPages <= 5 ? i + 1 : Math.max(1, Math.min(currentPage - 2, totalPages - 4)) + i;
+                  return (
+                    <button
+                      key={page}
+                      onClick={() => { setCurrentPage(page); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                      className={`inline-flex h-8 w-8 items-center justify-center rounded-lg text-xs font-bold transition-colors ${
+                        currentPage === page
+                          ? 'bg-indigo-600 text-white shadow-xs'
+                          : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800'
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  );
+                })}
+                <button
+                  onClick={() => { setCurrentPage(p => Math.min(totalPages, p + 1)); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                  disabled={currentPage === totalPages}
+                  className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 transition-colors"
+                >
+                  Next
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
     </div>

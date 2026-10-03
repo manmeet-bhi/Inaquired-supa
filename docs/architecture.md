@@ -1,6 +1,6 @@
 # Architecture & System Design Document
 ## Project: inaquired – Serverless Public Job Portal
-**Document**: `artitect.md`  
+**Document**: `architecture.md`  
 **Architecture Style**: Serverless Jamstack + Supabase Realtime Backend + S3 Egress Storage  
 **Target Environment**: Production / Cloud  
 
@@ -54,12 +54,12 @@ graph TD
 | Layer | Provider / Tool | Configuration Details |
 | :--- | :--- | :--- |
 | **Frontend Framework** | React 19 + TypeScript | Strict TS typing, Vite 8 bundler, Tailwind CSS v4 |
-| **Database** | Supabase PostgreSQL | `db.wnpsrdtlqxfiglhmalwq.supabase.co:5432/postgres` |
-| **Client API** | `@supabase/supabase-js` | Base URL: `https://wnpsrdtlqxfiglhmalwq.supabase.co` |
-| **Publishable Key** | Supabase Auth/Anon Token | `sb_publishable_n2im84IXBbQ3v2XluipN6Q_N_gfjbhu` |
-| **Storage Egress** | Supabase Storage S3 API | `https://wnpsrdtlqxfiglhmalwq.storage.supabase.co/storage/v1/s3` |
+| **Database** | Supabase PostgreSQL | Managed via environment variables |
+| **Client API** | `@supabase/supabase-js` | Base URL configured via `.env` |
+| **Publishable Key** | Supabase Auth/Anon Token | Configured via `.env` (`VITE_SUPABASE_ANON_KEY`) |
+| **Storage Egress** | Supabase Storage S3 API | Configured via `.env` (`VITE_SUPABASE_STORAGE_URL`) |
 | **Storage Bucket** | Object Storage Bucket | Bucket: `ap-northeast-1`, Region: `ap-northeast-1` |
-| **Direct Postgres** | Direct Connection | `postgresql://postgres:aXihkgIxLsig4svi@db.wnpsrdtlqxfiglhmalwq.supabase.co:5432/postgres` |
+| **Direct Postgres** | Direct Connection | Managed via `SUPABASE_DIRECT_URL` in `.env` |
 
 ---
 

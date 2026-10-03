@@ -48,7 +48,7 @@
 
 ### ADR-008: Supabase Auth for Admin Panel
 - **Context**: The admin dashboard needed authentication to secure listing management without imposing any login friction on public candidates.
-- **Decision**: Implemented [`src/services/adminAuthService.ts`](file:///c:/project/src/services/adminAuthService.ts) and [`src/pages/admin/AdminLoginPage.tsx`](file:///c:/project/src/pages/admin/AdminLoginPage.tsx) using `supabase.auth`. Supported JWT session persistence in `localStorage`, Sign In, Sign Out, and default administrator credentials (`admin@inaquired.app` / `AdminPassword123!`, managed via `npm run admin:create`). Candidates remain completely unauthenticated.
+- **Decision**: Implemented [`src/services/adminAuthService.ts`](file:///c:/project/src/services/adminAuthService.ts) and [`src/pages/admin/AdminLoginPage.tsx`](file:///c:/project/src/pages/admin/AdminLoginPage.tsx) using `supabase.auth`. Supported JWT session persistence in `localStorage`, Sign In, Sign Out, and explicitly provisioned administrator credentials via `npm run admin:create`. Candidates remain completely unauthenticated.
 
 ### ADR-009: Automated Schema Migrations Engine
 - **Context**: Future database modifications need deterministic, versioned, and idempotent execution against Supabase PostgreSQL.
@@ -166,11 +166,10 @@
 
 | Parameter | Value | Notes |
 | :--- | :--- | :--- |
-| **Supabase URL** | `https://wnpsrdtlqxfiglhmalwq.supabase.co` | Main REST and Realtime gateway |
-| **Publishable Key** | `sb_publishable_n2im84IXBbQ3v2XluipN6Q_N_gfjbhu` | Public client token for anon queries |
-| **Direct Postgres URI** | `postgresql://postgres:aXihkgIxLsig4svi@db.wnpsrdtlqxfiglhmalwq.supabase.co:5432/postgres` | Direct connection for migrations & DB administration |
-| **Postgres Password** | `aXihkgIxLsig4svi` | Database administrator password |
-| **Storage Egress Endpoint** | `https://wnpsrdtlqxfiglhmalwq.storage.supabase.co/storage/v1/s3` | S3-compatible storage API |
+| **Supabase URL** | Managed via `.env` (`VITE_SUPABASE_URL`) | Main REST and Realtime gateway |
+| **Publishable Key** | Managed via `.env` (`VITE_SUPABASE_ANON_KEY`) | Public client token for anon queries |
+| **Direct Postgres URI** | Managed via `.env` (`SUPABASE_DIRECT_URL`) | Direct connection for migrations & DB administration |
+| **Storage Egress Endpoint** | Managed via `.env` (`VITE_SUPABASE_STORAGE_URL`) | S3-compatible storage API |
 | **Storage Bucket** | `ap-northeast-1` | Asset storage bucket |
 | **Storage Region** | `ap-northeast-1` | AWS Tokyo region |
 

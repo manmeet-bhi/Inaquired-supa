@@ -1,5 +1,3 @@
-import { supabase } from '../lib/supabase';
-
 export interface ForgotPasswordResponse {
   success: boolean;
   message: string;
@@ -39,7 +37,6 @@ export async function requestPasswordReset(email: string): Promise<ForgotPasswor
     throw new Error('Please enter a valid email address.');
   }
 
-  // Attempt API route first (which triggers Resend email dispatch)
   try {
     const res = await fetch('/api/auth/forgot-password', {
       method: 'POST',
@@ -54,37 +51,8 @@ export async function requestPasswordReset(email: string): Promise<ForgotPasswor
 
     return data;
   } catch (apiErr: any) {
-    console.warn('[API Request Notice] Falling back to direct Supabase RPC:', apiErr.message);
-
-    // Fallback directly to Supabase RPC if API is offline
-    const fallbackToken = Array.from(crypto.getRandomValues(new Uint8Array(24)))
-      .map(b => b.toString(16).padStart(2, '0')).join('');
-    const fallbackOtp = Math.floor(100000 + Math.random() * 900000).toString();
-
-    const { data: rpcData, error: rpcErr } = await supabase.rpc('admin_request_password_reset', {
-      p_email: cleanEmail,
-      p_token: fallbackToken,
-      p_otp_code: fallbackOtp,
-      p_expires_minutes: 30
-    });
-
-    if (rpcErr) {
-      throw new Error(rpcErr.message);
-    }
-
-    if (!rpcData || !rpcData.exists) {
-      throw new Error('No administrator account was found with that email address.');
-    }
-
-    const resetUrl = `${window.location.origin}/admin/reset-password?token=${fallbackToken}&email=${encodeURIComponent(cleanEmail)}`;
-
-    return {
-      success: true,
-      message: `Recovery code generated. (${cleanEmail})`,
-      mode: 'dev_fallback',
-      devOtp: fallbackOtp,
-      previewUrl: resetUrl
-    };
+    console.warn('[API Request Notice] Password recovery endpoint failed:', apiErr.message);
+    throw new Error('Password recovery is temporarily unavailable. Please try again later.');
   }
 }
 
@@ -112,25 +80,8 @@ export async function verifyRecoveryToken(tokenOrOtp: string, email?: string): P
 
     return data;
   } catch (err: any) {
-    console.warn('[API Verify Notice] Falling back to direct Supabase RPC:', err.message);
-
-    const { data: rpcData, error: rpcErr } = await supabase.rpc('admin_verify_recovery_token', {
-      p_token_or_otp: cleanToken,
-      p_email: email?.trim() || null
-    });
-
-    if (rpcErr || !rpcData || !rpcData.valid) {
-      return {
-        valid: false,
-        error: rpcData?.error || rpcErr?.message || 'Invalid or expired recovery code.'
-      };
-    }
-
-    return {
-      valid: true,
-      email: rpcData.email,
-      expiresAt: rpcData.expires_at
-    };
+    console.warn('[API Verify Notice] Recovery endpoint failed:', err.message);
+    return { valid: false, error: 'Recovery verification is temporarily unavailable.' };
   }
 }
 
@@ -171,27 +122,8 @@ export async function resetAdminPassword(
 
     return data;
   } catch (err: any) {
-    console.warn('[API Reset Notice] Falling back to direct Supabase RPC:', err.message);
-
-    const { data: rpcData, error: rpcErr } = await supabase.rpc('admin_complete_password_reset', {
-      p_token_or_otp: cleanToken,
-      p_new_password: cleanPassword,
-      p_email: email?.trim() || null
-    });
-
-    if (rpcErr) {
-      throw new Error(rpcErr.message);
-    }
-
-    if (!rpcData || !rpcData.success) {
-      throw new Error('Unable to reset password. The code may have expired.');
-    }
-
-    return {
-      success: true,
-      message: 'Password successfully reset.',
-      email: rpcData.email
-    };
+    console.warn('[API Reset Notice] Recovery endpoint failed:', err.message);
+    throw new Error('Password reset is temporarily unavailable. Please try again later.');
   }
 }
 

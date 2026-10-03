@@ -14,9 +14,13 @@ import {
   Sparkles,
   BadgeCheck,
   Eye,
-  EyeOff
+  EyeOff,
+  ArrowRight
 } from 'lucide-react';
 import { AdminSessionUser, updateAdminProfile } from '../../services/adminAuthService';
+import { AdminTwoFactorSettings } from './AdminTwoFactorSettings';
+
+export type ProfileViewSection = 'profile' | 'security' | 'two_factor';
 
 /**
  * Generates a strictly alphanumeric ID formatted as:
@@ -43,7 +47,7 @@ interface AdminProfileViewProps {
   adminUser: AdminSessionUser;
   onUpdateAdminUser: (updatedUser: AdminSessionUser) => void;
   onShowToast: (message: string) => void;
-  initialSection?: 'profile' | 'security';
+  initialSection?: ProfileViewSection;
 }
 
 export const AdminProfileView: React.FC<AdminProfileViewProps> = ({
@@ -58,7 +62,7 @@ export const AdminProfileView: React.FC<AdminProfileViewProps> = ({
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [activeSection, setActiveSection] = useState<'profile' | 'security'>(initialSection);
+  const [activeSection, setActiveSection] = useState<ProfileViewSection>(initialSection);
   
   const [saving, setSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -200,8 +204,8 @@ export const AdminProfileView: React.FC<AdminProfileViewProps> = ({
         <div className="absolute -right-10 -bottom-10 h-48 w-48 rounded-full bg-indigo-500/20 blur-3xl pointer-events-none" />
       </div>
 
-      {/* Section Navigation Tabs: Profile & Security */}
-      <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-3">
+      {/* Section Navigation Tabs: Profile, Security, and 2FA */}
+      <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-3">
         <button
           type="button"
           onClick={() => setActiveSection('profile')}
@@ -224,24 +228,43 @@ export const AdminProfileView: React.FC<AdminProfileViewProps> = ({
               : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white'
           }`}
         >
-          <ShieldCheck className="h-4 w-4" />
-          <span>Security & Password</span>
+          <Lock className="h-4 w-4" />
+          <span>Password &amp; Credentials</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveSection('two_factor')}
+          className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold transition-all cursor-pointer ${
+            activeSection === 'two_factor'
+              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
+              : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white'
+          }`}
+        >
+          <ShieldCheck className="h-4 w-4 text-emerald-400" />
+          <span>Two-Factor Authentication (2FA)</span>
         </button>
       </div>
 
-      {/* Profile / Security Form Card */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-6 sm:p-8 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        
-        <div className="border-b border-slate-100 pb-5 mb-6 dark:border-slate-800">
-          <h2 className="text-base font-bold text-slate-900 dark:text-white">
-            {activeSection === 'profile' ? 'Personal Information & Identity' : 'Security & Access Credentials'}
-          </h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            {activeSection === 'profile' 
-              ? 'Update your administrative account display name, email address, and view your system ID.' 
-              : 'Change your administrative sign-in password and review authentication security.'}
-          </p>
-        </div>
+      {activeSection === 'two_factor' ? (
+        <AdminTwoFactorSettings
+          adminUser={adminUser}
+          onShowToast={onShowToast}
+        />
+      ) : (
+        /* Profile / Security Form Card */
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 sm:p-8 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          
+          <div className="border-b border-slate-100 pb-5 mb-6 dark:border-slate-800">
+            <h2 className="text-base font-bold text-slate-900 dark:text-white">
+              {activeSection === 'profile' ? 'Personal Information & Identity' : 'Security & Access Credentials'}
+            </h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+              {activeSection === 'profile' 
+                ? 'Update your administrative account display name, email address, and view your system ID.' 
+                : 'Change your administrative sign-in password and manage account credentials.'}
+            </p>
+          </div>
 
         {/* Alerts */}
         {errorMessage && (
@@ -445,6 +468,32 @@ export const AdminProfileView: React.FC<AdminProfileViewProps> = ({
                   </div>
                 </div>
               </div>
+
+              {/* Quick link to 2FA inside Security section */}
+              <div className="rounded-xl border border-indigo-100 bg-indigo-50/70 p-4 dark:border-indigo-900/40 dark:bg-indigo-950/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 mt-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-600 text-white shadow-xs">
+                    <ShieldCheck className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-900 dark:text-white">
+                      Two-Factor Authentication (2FA) Security
+                    </h4>
+                    <p className="text-[11px] text-slate-600 dark:text-slate-400">
+                      Configure Google Authenticator, Email Code, and Backup Recovery Keys.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setActiveSection('two_factor')}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 transition-colors cursor-pointer self-start sm:self-auto shrink-0 shadow-xs"
+                >
+                  <span>Configure 2FA</span>
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </button>
+              </div>
+
             </div>
           )}
 
@@ -480,6 +529,7 @@ export const AdminProfileView: React.FC<AdminProfileViewProps> = ({
 
         </form>
       </div>
+      )}
 
       {/* Account Security Information Card */}
       <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">

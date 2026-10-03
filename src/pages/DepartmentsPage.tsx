@@ -12,8 +12,11 @@ import {
   Layers, 
   ArrowRight, 
   Search,
-  Briefcase
+  FolderSearch,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
+import { JobIcon } from '../components/icons/JobIcon';
 import { Job } from '../types/job';
 
 interface DepartmentsPageProps {
@@ -92,6 +95,8 @@ export const DepartmentsPage: React.FC<DepartmentsPageProps> = ({
   onSelectJob,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 12;
 
   // Extract all distinct categories from actual jobs
   const jobCategories = Array.from(new Set(jobs.map((j) => (j.category || '').trim()).filter(Boolean)));
@@ -107,7 +112,7 @@ export const DepartmentsPage: React.FC<DepartmentsPageProps> = ({
         name: catName,
         slug,
         description: `Explore verified opportunities and openings in ${catName}.`,
-        icon: Briefcase,
+        icon: JobIcon,
       });
     }
   });
@@ -149,6 +154,10 @@ export const DepartmentsPage: React.FC<DepartmentsPageProps> = ({
     if (b.count !== a.count) return b.count - a.count;
     return a.name.localeCompare(b.name);
   });
+
+  // Pagination
+  const totalPages = Math.ceil(filteredDepartments.length / ITEMS_PER_PAGE);
+  const paginatedDepartments = filteredDepartments.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
   return (
     <div className="space-y-10 sm:space-y-14 pb-16">
@@ -203,7 +212,7 @@ export const DepartmentsPage: React.FC<DepartmentsPageProps> = ({
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {filteredDepartments.map((dept) => {
+          {paginatedDepartments.map((dept) => {
             const Icon = dept.icon;
             return (
               <div
@@ -265,6 +274,50 @@ export const DepartmentsPage: React.FC<DepartmentsPageProps> = ({
             );
           })}
         </div>
+
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between pt-4 border-t border-slate-200 dark:border-slate-800">
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Page <strong className="text-slate-800 dark:text-slate-200">{currentPage}</strong> of{' '}
+              <strong className="text-slate-800 dark:text-slate-200">{totalPages}</strong>
+            </p>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => { setCurrentPage(p => Math.max(1, p - 1)); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                disabled={currentPage === 1}
+                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 transition-colors"
+              >
+                <ChevronLeft className="h-3.5 w-3.5" />
+                Prev
+              </button>
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                const page = totalPages <= 5 ? i + 1 : Math.max(1, Math.min(currentPage - 2, totalPages - 4)) + i;
+                return (
+                  <button
+                    key={page}
+                    onClick={() => { setCurrentPage(page); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                    className={`inline-flex h-8 w-8 items-center justify-center rounded-lg text-xs font-bold transition-colors ${
+                      currentPage === page
+                        ? 'bg-indigo-600 text-white shadow-xs'
+                        : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800'
+                    }`}
+                  >
+                    {page}
+                  </button>
+                );
+              })}
+              <button
+                onClick={() => { setCurrentPage(p => Math.min(totalPages, p + 1)); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                disabled={currentPage === totalPages}
+                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 transition-colors"
+              >
+                Next
+                <ChevronRight className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
+        )}
       </section>
 
     </div>

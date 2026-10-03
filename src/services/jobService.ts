@@ -31,6 +31,11 @@ function mapFromDb(row: any): Job {
     updatedAt: row.updated_at || row.updatedAt,
     publishedAt: row.published_at || row.publishedAt,
     createdBy: row.created_by || row.createdBy,
+    seoTitle: row.seo_title || row.seoTitle,
+    seoDescription: row.seo_description || row.seoDescription,
+    seoImageUrl: row.seo_image_url || row.seoImageUrl,
+    canonicalUrl: row.canonical_url || row.canonicalUrl,
+    noIndex: row.no_index !== undefined ? Boolean(row.no_index) : undefined,
   };
 }
 
@@ -60,6 +65,11 @@ function mapToDb(job: Partial<Job>): Record<string, any> {
   if (job.updatedAt !== undefined) row.updated_at = job.updatedAt;
   if (job.publishedAt !== undefined) row.published_at = job.publishedAt;
   if (job.createdBy !== undefined) row.created_by = job.createdBy;
+  if (job.seoTitle !== undefined) row.seo_title = job.seoTitle;
+  if (job.seoDescription !== undefined) row.seo_description = job.seoDescription;
+  if (job.seoImageUrl !== undefined) row.seo_image_url = job.seoImageUrl;
+  if (job.canonicalUrl !== undefined) row.canonical_url = job.canonicalUrl;
+  if (job.noIndex !== undefined) row.no_index = job.noIndex;
   return row;
 }
 
@@ -169,11 +179,14 @@ export function subscribeToAllJobsForAdmin(
  * Fetches a single job by its unique slug or ID from Supabase.
  */
 export async function getJobBySlug(slug: string): Promise<Job | null> {
+  const cleanSlug = slug.replace(/[^a-zA-Z0-9._-]/g, '').trim();
+  if (!cleanSlug) return null;
+
   try {
     const { data, error } = await supabase
       .from('jobs')
       .select('*')
-      .or(`slug.eq.${slug},id.eq.${slug}`)
+      .or(`slug.eq.${cleanSlug},id.eq.${cleanSlug}`)
       .limit(1)
       .maybeSingle();
 
@@ -190,6 +203,35 @@ export async function getJobBySlug(slug: string): Promise<Job | null> {
   } catch (error) {
     console.error('Supabase getJobBySlug network error:', error);
     return null;
+  }
+}
+
+/**
+ * Searches published jobs directly in the Supabase PostgreSQL database in real-time.
+ */
+export async function searchJobsInDatabase(query: string, limit: number = 20): Promise<Job[]> {
+  // Strip control and special characters that could alter PostgREST filter structure
+  const cleanQuery = query.replace(/[,()"\\]/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!cleanQuery) return [];
+
+  try {
+    const { data, error } = await supabase
+      .from('jobs')
+      .select('*')
+      .eq('status', 'published')
+      .or(`title.ilike.%${cleanQuery}%,company_name.ilike.%${cleanQuery}%,category.ilike.%${cleanQuery}%,location.ilike.%${cleanQuery}%`)
+      .order('published_at', { ascending: false })
+      .limit(limit);
+
+    if (error) {
+      console.warn('Supabase database search error:', error.message);
+      return [];
+    }
+
+    return (data || []).map(mapFromDb);
+  } catch (err) {
+    console.warn('Database search exception:', err);
+    return [];
   }
 }
 

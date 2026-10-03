@@ -35,7 +35,7 @@
 ├── .env.example               # Template environment configuration
 ├── docs/                      # Comprehensive platform documentation
 │   ├── prd.md                 # Product Requirements Document
-│   ├── artitect.md            # Architecture & System Design Document
+│   ├── architecture.md        # Architecture & System Design Document
 │   ├── rules.md               # Engineering & Quality Standards
 │   ├── design.md              # Design System & UI/UX Specification
 │   ├── tasks.md               # Implementation Tasks & Roadmap
@@ -88,29 +88,6 @@
 
 ---
 
-## 4. Supabase & Egress Storage Configuration
-
-The environment is configured with the following credentials:
-- **Supabase URL**: `https://wnpsrdtlqxfiglhmalwq.supabase.co`
-- **Publishable Key**: `sb_publishable_n2im84IXBbQ3v2XluipN6Q_N_gfjbhu`
-- **Direct Postgres Connection**:
-  ```text
-  postgresql://postgres:aXihkgIxLsig4svi@db.wnpsrdtlqxfiglhmalwq.supabase.co:5432/postgres
-  ```
-- **Storage Egress Endpoint**:
-  ```text
-  https://wnpsrdtlqxfiglhmalwq.storage.supabase.co/storage/v1/s3
-  ```
-- **Region**: `ap-northeast-1`
-- **Bucket**: `ap-northeast-1`
-
-### Running Database Migrations
-To initialize or refresh tables (`jobs`, `subscribers`, `audit_logs`) and Row Level Security:
-1. Open the [Supabase Dashboard SQL Editor](https://app.supabase.com) or connect via `psql`.
-2. Execute the DDL statements in [`supabase/schema.sql`](file:///c:/project/supabase/schema.sql).
-
----
-
 ## 5. Development & Testing Commands
 
 ```bash
@@ -133,11 +110,10 @@ npm run dev
 npm run admin:create
 ```
 
-### Admin Console Access & Default Credentials
+### Admin Console Access
 - **URL**: [http://localhost:3000/admin](http://localhost:3000/admin) (or click **Admin Portal** in the website footer)
-- **Default Email**: `admin@inaquired.app`
-- **Default Password**: `AdminPassword123!`
-*(The login page also provides a 1-click **Auto-fill** button for quick access)*
+- Provision administrator credentials explicitly with the `ADMIN_EMAIL` and `ADMIN_PASSWORD` environment variables before running `npm run admin:create`. Never commit production credentials.
+- Configure `APP_URL` as the public HTTPS origin in production, and provide `SUPABASE_SERVICE_ROLE_KEY` to the server for protected recovery and 2FA RPCs. `SUPABASE_DIRECT_URL` remains the database fallback; never expose server keys through `VITE_` variables.
 
 ---
 
@@ -145,7 +121,7 @@ npm run admin:create
 
 Full architectural documentation is available in the [`docs/`](file:///c:/project/docs) directory:
 - [**Product Requirements Document (PRD)**](file:///c:/project/docs/prd.md)
-- [**Architecture & System Design**](file:///c:/project/docs/artitect.md)
+- [**Architecture & System Design**](docs/architecture.md)
 - [**Engineering Rules & Standards**](file:///c:/project/docs/rules.md)
 - [**Design System & UI/UX**](file:///c:/project/docs/design.md)
 - [**Implementation Tasks & Roadmap**](file:///c:/project/docs/tasks.md)

@@ -2,13 +2,14 @@ import React, { useState } from 'react';
 import { 
   Building2, 
   MapPin, 
-  Briefcase, 
   ArrowRight, 
   Search, 
   Globe2, 
   Laptop, 
   Building,
-  CheckCircle2
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { Job } from '../types/job';
 
@@ -24,6 +25,8 @@ export const CompaniesPage: React.FC<CompaniesPageProps> = ({
   onSelectJob,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 12;
 
   // Group jobs by company name
   const companyMap = new Map<string, Job[]>();
@@ -71,6 +74,10 @@ export const CompaniesPage: React.FC<CompaniesPageProps> = ({
     if (b.count !== a.count) return b.count - a.count;
     return a.name.localeCompare(b.name);
   });
+
+  // Pagination
+  const totalPages = Math.ceil(filteredCompanies.length / ITEMS_PER_PAGE);
+  const paginatedCompanies = filteredCompanies.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
   return (
     <div className="space-y-10 sm:space-y-14 pb-16">
@@ -142,7 +149,7 @@ export const CompaniesPage: React.FC<CompaniesPageProps> = ({
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {filteredCompanies.map((company) => {
+            {paginatedCompanies.map((company) => {
               return (
                 <div
                   key={company.name}
@@ -233,6 +240,51 @@ export const CompaniesPage: React.FC<CompaniesPageProps> = ({
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between pt-4 border-t border-slate-200 dark:border-slate-800">
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Page <strong className="text-slate-800 dark:text-slate-200">{currentPage}</strong> of{' '}
+              <strong className="text-slate-800 dark:text-slate-200">{totalPages}</strong>{' '}·{' '}
+              <strong className="text-slate-800 dark:text-slate-200">{filteredCompanies.length}</strong> companies
+            </p>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => { setCurrentPage(p => Math.max(1, p - 1)); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                disabled={currentPage === 1}
+                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 transition-colors"
+              >
+                <ChevronLeft className="h-3.5 w-3.5" />
+                Prev
+              </button>
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                const page = totalPages <= 5 ? i + 1 : Math.max(1, Math.min(currentPage - 2, totalPages - 4)) + i;
+                return (
+                  <button
+                    key={page}
+                    onClick={() => { setCurrentPage(page); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                    className={`inline-flex h-8 w-8 items-center justify-center rounded-lg text-xs font-bold transition-colors ${
+                      currentPage === page
+                        ? 'bg-indigo-600 text-white shadow-xs'
+                        : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800'
+                    }`}
+                  >
+                    {page}
+                  </button>
+                );
+              })}
+              <button
+                onClick={() => { setCurrentPage(p => Math.min(totalPages, p + 1)); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                disabled={currentPage === totalPages}
+                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 transition-colors"
+              >
+                Next
+                <ChevronRight className="h-3.5 w-3.5" />
+              </button>
+            </div>
           </div>
         )}
       </section>

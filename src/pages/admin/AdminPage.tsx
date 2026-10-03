@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
-  Briefcase, 
   Building, 
   MapPin, 
   Plus, 
@@ -37,8 +36,11 @@ import {
   UserPlus,
   ShieldAlert,
   Shield,
-  KeyRound
+  KeyRound,
+  LayoutDashboard,
+  Globe
 } from 'lucide-react';
+import { JobIcon } from '../../components/icons/JobIcon';
 import { Job, JobStatus, WorkArrangement, JobType } from '../../types/job';
 import { 
   subscribeToAllJobsForAdmin, 
@@ -74,16 +76,20 @@ import {
   onAdminAuthStateChange, 
   AdminSessionUser 
 } from '../../services/adminAuthService';
-import { JobFormModal } from '../../components/admin/JobFormModal';
+import { JobEditorPage } from '../../components/admin/JobEditorPage';
+import { CategoryEditorPage } from '../../components/admin/CategoryEditorPage';
+import { UserEditorPage } from '../../components/admin/UserEditorPage';
+import { AdminHomeDashboard } from '../../components/admin/AdminHomeDashboard';
+import { SeoPanel } from '../../components/admin/SeoPanel';
 import { DeleteConfirmModal } from '../../components/admin/DeleteConfirmModal';
-import { CategoryModal } from '../../components/admin/CategoryModal';
 import { DeleteCategoryModal } from '../../components/admin/DeleteCategoryModal';
-import { UserModal } from '../../components/admin/UserModal';
 import { DeleteUserModal } from '../../components/admin/DeleteUserModal';
 import { AdminProfileView } from '../../components/admin/AdminProfileView';
 import { AdminFooter } from '../../components/admin/AdminFooter';
+import { AdminHeader } from '../../components/admin/AdminHeader';
 import { AdminThemeToggle } from '../../components/admin/AdminThemeToggle';
 import { AdminLoginPage } from './AdminLoginPage';
+import { get2FaStatus } from '../../services/twoFactorService';
 import { formatSalary } from '../../utils/jobUtils';
 import { useTheme } from '../../context/ThemeContext';
 
@@ -91,26 +97,274 @@ interface AdminPageProps {
   onNavigate: (path: string) => void;
 }
 
-type AdminTab = 'jobs' | 'categories' | 'users' | 'system' | 'profile';
+export type AdminTab = 'home' | 'jobs' | 'categories' | 'users' | 'seo' | 'system' | 'profile';
 
-function getInitialAdminTab(): AdminTab {
+export interface AdminRouteState {
+  tab: AdminTab;
+  isJobEditorOpen: boolean;
+  editingJobId: string | null;
+  isCategoryEditorOpen: boolean;
+  editingCategoryId: string | null;
+  isUserEditorOpen: boolean;
+  editingUserId: string | null;
+  statusFilter?: 'all' | JobStatus;
+}
+
+export function parseAdminPath(pathname: string): AdminRouteState {
+  const [pathOnly, searchOnly] = pathname.split('?');
+  const searchParams = new URLSearchParams(searchOnly || (typeof window !== 'undefined' ? window.location.search : ''));
+  const clean = (pathOnly || '/admin').replace(/\/+$/, '') || '/admin';
+
+  let initialStatusFilter: ('all' | JobStatus) | undefined;
+  const statusParam = searchParams.get('status');
+  if (statusParam && ['all', 'published', 'draft', 'archived'].includes(statusParam)) {
+    initialStatusFilter = statusParam as 'all' | JobStatus;
+  }
+
+  // 1. Home Dashboard: /admin or /admin/home or /admin/dashboard
+  if (clean === '/admin' || clean === '/admin/home' || clean === '/admin/dashboard') {
+    return {
+      tab: 'home',
+      isJobEditorOpen: false,
+      editingJobId: null,
+      isCategoryEditorOpen: false,
+      editingCategoryId: null,
+      isUserEditorOpen: false,
+      editingUserId: null,
+    };
+  }
+
+  // Dedicated Drafts route: /admin/drafts or /admin/jobs/drafts
+  if (clean === '/admin/drafts' || clean === '/admin/jobs/drafts') {
+    return {
+      tab: 'jobs',
+      isJobEditorOpen: false,
+      editingJobId: null,
+      isCategoryEditorOpen: false,
+      editingCategoryId: null,
+      isUserEditorOpen: false,
+      editingUserId: null,
+      statusFilter: 'draft',
+    };
+  }
+
+  // Dedicated Archived route: /admin/archived or /admin/jobs/archived
+  if (clean === '/admin/archived' || clean === '/admin/jobs/archived') {
+    return {
+      tab: 'jobs',
+      isJobEditorOpen: false,
+      editingJobId: null,
+      isCategoryEditorOpen: false,
+      editingCategoryId: null,
+      isUserEditorOpen: false,
+      editingUserId: null,
+      statusFilter: 'archived',
+    };
+  }
+
+  // 2. Jobs: /admin/jobs
+  if (clean === '/admin/jobs') {
+    return {
+      tab: 'jobs',
+      isJobEditorOpen: false,
+      editingJobId: null,
+      isCategoryEditorOpen: false,
+      editingCategoryId: null,
+      isUserEditorOpen: false,
+      editingUserId: null,
+      statusFilter: initialStatusFilter || 'all',
+    };
+  }
+
+  // 3. Add Job: /admin/add-new-job or /admin/jobs/new or /admin/new-job
+  if (clean === '/admin/add-new-job' || clean === '/admin/jobs/new' || clean === '/admin/new-job') {
+    return {
+      tab: 'jobs',
+      isJobEditorOpen: true,
+      editingJobId: null,
+      isCategoryEditorOpen: false,
+      editingCategoryId: null,
+      isUserEditorOpen: false,
+      editingUserId: null,
+    };
+  }
+
+  // 4. Edit Job: /admin/edit-job/:id
+  const editJobMatch = clean.match(/^\/admin\/(?:edit-job|jobs\/edit)\/([^/]+)$/);
+  if (editJobMatch) {
+    return {
+      tab: 'jobs',
+      isJobEditorOpen: true,
+      editingJobId: editJobMatch[1],
+      isCategoryEditorOpen: false,
+      editingCategoryId: null,
+      isUserEditorOpen: false,
+      editingUserId: null,
+    };
+  }
+
+  // 5. Departments: /admin/departments or /admin/categories
+  if (clean === '/admin/departments' || clean === '/admin/categories') {
+    return {
+      tab: 'categories',
+      isJobEditorOpen: false,
+      editingJobId: null,
+      isCategoryEditorOpen: false,
+      editingCategoryId: null,
+      isUserEditorOpen: false,
+      editingUserId: null,
+    };
+  }
+
+  // 6. Add Department: /admin/add-new-department or /admin/departments/new or /admin/add-new-category
+  if (
+    clean === '/admin/add-new-department' ||
+    clean === '/admin/departments/new' ||
+    clean === '/admin/new-department' ||
+    clean === '/admin/add-new-category' ||
+    clean === '/admin/categories/new'
+  ) {
+    return {
+      tab: 'categories',
+      isJobEditorOpen: false,
+      editingJobId: null,
+      isCategoryEditorOpen: true,
+      editingCategoryId: null,
+      isUserEditorOpen: false,
+      editingUserId: null,
+    };
+  }
+
+  // 7. Edit Department: /admin/edit-department/:id
+  const editCategoryMatch = clean.match(/^\/admin\/(?:edit-department|departments\/edit|edit-category|categories\/edit)\/([^/]+)$/);
+  if (editCategoryMatch) {
+    return {
+      tab: 'categories',
+      isJobEditorOpen: false,
+      editingJobId: null,
+      isCategoryEditorOpen: true,
+      editingCategoryId: editCategoryMatch[1],
+      isUserEditorOpen: false,
+      editingUserId: null,
+    };
+  }
+
+  // 8. Users: /admin/users or /admin/team
+  if (clean === '/admin/users' || clean === '/admin/team') {
+    return {
+      tab: 'users',
+      isJobEditorOpen: false,
+      editingJobId: null,
+      isCategoryEditorOpen: false,
+      editingCategoryId: null,
+      isUserEditorOpen: false,
+      editingUserId: null,
+    };
+  }
+
+  // 9. Add User: /admin/add-new-user or /admin/users/new or /admin/new-user
+  if (clean === '/admin/add-new-user' || clean === '/admin/users/new' || clean === '/admin/new-user') {
+    return {
+      tab: 'users',
+      isJobEditorOpen: false,
+      editingJobId: null,
+      isCategoryEditorOpen: false,
+      editingCategoryId: null,
+      isUserEditorOpen: true,
+      editingUserId: null,
+    };
+  }
+
+  // 10. Edit User: /admin/edit-user/:id
+  const editUserMatch = clean.match(/^\/admin\/(?:edit-user|users\/edit)\/([^/]+)$/);
+  if (editUserMatch) {
+    return {
+      tab: 'users',
+      isJobEditorOpen: false,
+      editingJobId: null,
+      isCategoryEditorOpen: false,
+      editingCategoryId: null,
+      isUserEditorOpen: true,
+      editingUserId: editUserMatch[1],
+    };
+  }
+
+  // 11. SEO Suite: /admin/seo or /admin/seo-settings
+  if (clean === '/admin/seo' || clean === '/admin/seo-settings') {
+    return {
+      tab: 'seo',
+      isJobEditorOpen: false,
+      editingJobId: null,
+      isCategoryEditorOpen: false,
+      editingCategoryId: null,
+      isUserEditorOpen: false,
+      editingUserId: null,
+    };
+  }
+
+  // 12. Database / System: /admin/system or /admin/database
+  if (clean === '/admin/system' || clean === '/admin/database') {
+    return {
+      tab: 'system',
+      isJobEditorOpen: false,
+      editingJobId: null,
+      isCategoryEditorOpen: false,
+      editingCategoryId: null,
+      isUserEditorOpen: false,
+      editingUserId: null,
+    };
+  }
+
+  // 13. Profile: /admin/profile or /admin/account or /admin/security or /admin/2fa
+  if (
+    clean === '/admin/profile' || 
+    clean === '/admin/account' || 
+    clean === '/admin/security' || 
+    clean === '/admin/2fa' || 
+    clean === '/admin/two-factor'
+  ) {
+    return {
+      tab: 'profile',
+      isJobEditorOpen: false,
+      editingJobId: null,
+      isCategoryEditorOpen: false,
+      editingCategoryId: null,
+      isUserEditorOpen: false,
+      editingUserId: null,
+    };
+  }
+
+  // Fallback: check query parameter ?tab=... for backward compatibility
   if (typeof window !== 'undefined') {
     const params = new URLSearchParams(window.location.search);
     const tabParam = params.get('tab');
-    if (tabParam && ['jobs', 'categories', 'users', 'system', 'profile'].includes(tabParam)) {
-      return tabParam as AdminTab;
-    }
-    const savedTab = localStorage.getItem('admin_active_tab');
-    if (savedTab && ['jobs', 'categories', 'users', 'system', 'profile'].includes(savedTab)) {
-      return savedTab as AdminTab;
+    if (tabParam && ['home', 'jobs', 'categories', 'users', 'seo', 'system', 'profile'].includes(tabParam)) {
+      return {
+        tab: tabParam as AdminTab,
+        isJobEditorOpen: false,
+        editingJobId: null,
+        isCategoryEditorOpen: false,
+        editingCategoryId: null,
+        isUserEditorOpen: false,
+        editingUserId: null,
+      };
     }
   }
-  return 'jobs';
+
+  return {
+    tab: 'home',
+    isJobEditorOpen: false,
+    editingJobId: null,
+    isCategoryEditorOpen: false,
+    editingCategoryId: null,
+    isUserEditorOpen: false,
+    editingUserId: null,
+  };
 }
 
 interface ResendAccountMenuProps {
   adminUser: AdminSessionUser;
-  onNavigateProfile: (section: 'profile' | 'security') => void;
+  onNavigateProfile: (section: 'profile' | 'security' | 'two_factor') => void;
   onNavigateHome: () => void;
   onSignOut: () => void;
   className?: string;
@@ -150,7 +404,17 @@ const ResendAccountMenu: React.FC<ResendAccountMenuProps> = ({
         onClick={() => onNavigateProfile('security')}
         className="w-full text-left px-3 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors cursor-pointer block font-normal"
       >
-        Security
+        Security &amp; Password
+      </button>
+
+      {/* Menu Option: Two-Factor Auth (2FA) */}
+      <button
+        type="button"
+        onClick={() => onNavigateProfile('two_factor')}
+        className="w-full flex items-center justify-between px-3 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors cursor-pointer font-normal text-left"
+      >
+        <span>Two-Factor Auth (2FA)</span>
+        <span className="inline-flex h-2 w-2 rounded-full bg-emerald-500 ring-2 ring-emerald-500/20" />
       </button>
 
       {/* Divider */}
@@ -188,41 +452,91 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
   const [adminUser, setAdminUser] = useState<AdminSessionUser | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
 
-  // Active Tab & Sidebar State
-  const [activeTab, setActiveTab] = useState<AdminTab>(getInitialAdminTab);
+  // Initial Route parsed from clean URL
+  const initialRoute = useMemo(() => {
+    if (typeof window !== 'undefined') {
+      return parseAdminPath(window.location.pathname + window.location.search);
+    }
+    return {
+      tab: 'home' as AdminTab,
+      isJobEditorOpen: false,
+      editingJobId: null,
+      isCategoryEditorOpen: false,
+      editingCategoryId: null,
+      isUserEditorOpen: false,
+      editingUserId: null,
+      statusFilter: 'all' as const
+    };
+  }, []);
 
-  const changeTab = (tab: AdminTab) => {
-    setActiveTab(tab);
+  // Active Tab & Navigation State
+  const [activeTab, setActiveTab] = useState<AdminTab>(initialRoute.tab);
+
+  // Editor states with ID tracking for clean URL resolution
+  const [isJobEditorOpen, setIsJobEditorOpen] = useState(initialRoute.isJobEditorOpen);
+  const [editingJobId, setEditingJobId] = useState<string | null>(initialRoute.editingJobId);
+  const [editingJob, setEditingJob] = useState<Job | null>(null);
+
+  const [isCategoryEditorOpen, setIsCategoryEditorOpen] = useState(initialRoute.isCategoryEditorOpen);
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(initialRoute.editingCategoryId);
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+
+  const [isUserEditorOpen, setIsUserEditorOpen] = useState(initialRoute.isUserEditorOpen);
+  const [editingUserId, setEditingUserId] = useState<string | null>(initialRoute.editingUserId);
+  const [editingUser, setEditingUser] = useState<ManagedUser | null>(null);
+
+  const navigateToAdminPath = (path: string, push: boolean = true) => {
+    if (typeof window !== 'undefined') {
+      const currentFull = window.location.pathname + window.location.search;
+      if (push && currentFull !== path) {
+        window.history.pushState(null, '', path);
+      } else if (!push) {
+        window.history.replaceState(null, '', path);
+      }
+    }
+    const parsed = parseAdminPath(path);
+    setActiveTab(parsed.tab);
+    if (parsed.statusFilter !== undefined) {
+      setStatusFilter(parsed.statusFilter);
+    }
+    setIsJobEditorOpen(parsed.isJobEditorOpen);
+    setEditingJobId(parsed.editingJobId);
+    setIsCategoryEditorOpen(parsed.isCategoryEditorOpen);
+    setEditingCategoryId(parsed.editingCategoryId);
+    setIsUserEditorOpen(parsed.isUserEditorOpen);
+    setEditingUserId(parsed.editingUserId);
     if (typeof window !== 'undefined') {
       try {
-        localStorage.setItem('admin_active_tab', tab);
-        const url = new URL(window.location.href);
-        url.searchParams.set('tab', tab);
-        window.history.replaceState(null, '', url.pathname + url.search);
-      } catch (err) {
-        console.warn('Tab state URL sync notice:', err);
-      }
+        localStorage.setItem('admin_active_tab', parsed.tab);
+      } catch (e) {}
     }
   };
 
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const url = new URL(window.location.href);
-      if (url.searchParams.get('tab') !== activeTab) {
-        url.searchParams.set('tab', activeTab);
-        window.history.replaceState(null, '', url.pathname + url.search);
-      }
-    }
-  }, [activeTab]);
+  const changeTab = (tab: AdminTab) => {
+    let target = '/admin/home';
+    if (tab === 'jobs') target = '/admin/jobs';
+    else if (tab === 'categories') target = '/admin/departments';
+    else if (tab === 'users') target = '/admin/users';
+    else if (tab === 'seo') target = '/admin/seo';
+    else if (tab === 'system') target = '/admin/system';
+    else if (tab === 'profile') target = '/admin/profile';
+    navigateToAdminPath(target);
+  };
 
   useEffect(() => {
     const handlePopState = () => {
       if (typeof window !== 'undefined') {
-        const params = new URLSearchParams(window.location.search);
-        const tabParam = params.get('tab');
-        if (tabParam && ['jobs', 'categories', 'users', 'system', 'profile'].includes(tabParam)) {
-          setActiveTab(tabParam as AdminTab);
+        const parsed = parseAdminPath(window.location.pathname + window.location.search);
+        setActiveTab(parsed.tab);
+        if (parsed.statusFilter !== undefined) {
+          setStatusFilter(parsed.statusFilter);
         }
+        setIsJobEditorOpen(parsed.isJobEditorOpen);
+        setEditingJobId(parsed.editingJobId);
+        setIsCategoryEditorOpen(parsed.isCategoryEditorOpen);
+        setEditingCategoryId(parsed.editingCategoryId);
+        setIsUserEditorOpen(parsed.isUserEditorOpen);
+        setEditingUserId(parsed.editingUserId);
       }
     };
     window.addEventListener('popstate', handlePopState);
@@ -239,7 +553,19 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
 
   // Profile dropdown and active section state
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
-  const [profileSection, setProfileSection] = useState<'profile' | 'security'>('profile');
+  const [profileSection, setProfileSection] = useState<'profile' | 'security' | 'two_factor'>(() => {
+    if (typeof window !== 'undefined') {
+      const search = window.location.search;
+      const path = window.location.pathname;
+      if (search.includes('section=two_factor') || search.includes('tab=2fa') || path.includes('2fa') || path.includes('two-factor')) {
+        return 'two_factor';
+      }
+      if (search.includes('section=security') || path.includes('security')) {
+        return 'security';
+      }
+    }
+    return 'profile';
+  });
   const [dropdownCoords, setDropdownCoords] = useState<{ top: number; left: number } | null>(null);
   const sidebarProfileRef = React.useRef<HTMLDivElement>(null);
 
@@ -311,22 +637,18 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
 
   // Jobs Search & Filter States
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | JobStatus>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | JobStatus>(initialRoute.statusFilter || 'all');
   const [arrangementFilter, setWorkArrangementFilter] = useState<string>('all');
   const [jobTypeFilter, setJobTypeFilter] = useState<string>('all');
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'newest' | 'salary' | 'title'>('newest');
 
-  // Job Modals
-  const [isJobModalOpen, setIsJobModalOpen] = useState(false);
-  const [editingJob, setEditingJob] = useState<Job | null>(null);
+  // Job Delete Modal States
   const [isDeleteJobModalOpen, setIsDeleteJobModalOpen] = useState(false);
   const [deletingJob, setDeletingJob] = useState<Job | null>(null);
   const [isDeletingJob, setIsDeletingJob] = useState(false);
 
-  // Category Modals
-  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
-  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  // Category Delete Modal States
   const [isDeleteCategoryModalOpen, setIsDeleteCategoryModalOpen] = useState(false);
   const [deletingCategory, setDeletingCategory] = useState<Category | null>(null);
   const [isDeletingCategory, setIsDeletingCategory] = useState(false);
@@ -338,12 +660,38 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
   const [userRoleFilter, setUserRoleFilter] = useState<'all' | UserRole>('all');
   const [userStatusFilter, setUserStatusFilter] = useState<'all' | UserStatus>('all');
 
-  // User Modals
-  const [isUserModalOpen, setIsUserModalOpen] = useState(false);
-  const [editingUser, setEditingUser] = useState<ManagedUser | null>(null);
+  // User Delete Modal States
   const [isDeleteUserModalOpen, setIsDeleteUserModalOpen] = useState(false);
   const [deletingUser, setDeletingUser] = useState<ManagedUser | null>(null);
   const [isDeletingUser, setIsDeletingUser] = useState(false);
+
+  // Synchronize editing entities with URL parameters
+  useEffect(() => {
+    if (editingJobId && jobs.length > 0) {
+      const match = jobs.find((j) => j.id === editingJobId || j.slug === editingJobId);
+      if (match) setEditingJob(match);
+    } else if (!editingJobId && !isJobEditorOpen) {
+      setEditingJob(null);
+    }
+  }, [editingJobId, jobs, isJobEditorOpen]);
+
+  useEffect(() => {
+    if (editingCategoryId && categories.length > 0) {
+      const match = categories.find((c) => c.id === editingCategoryId || c.slug === editingCategoryId);
+      if (match) setEditingCategory(match);
+    } else if (!editingCategoryId && !isCategoryEditorOpen) {
+      setEditingCategory(null);
+    }
+  }, [editingCategoryId, categories, isCategoryEditorOpen]);
+
+  useEffect(() => {
+    if (editingUserId && users.length > 0) {
+      const match = users.find((u) => u.id === editingUserId);
+      if (match) setEditingUser(match);
+    } else if (!editingUserId && !isUserEditorOpen) {
+      setEditingUser(null);
+    }
+  }, [editingUserId, users, isUserEditorOpen]);
 
   // Toast Notification
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -367,8 +715,26 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
   useEffect(() => {
     let mounted = true;
     getAdminSession()
-      .then((user) => {
+      .then(async (user) => {
         if (mounted) {
+          if (user) {
+            // Check if user has 2FA enabled
+            try {
+              const twoFa = await get2FaStatus(user.email);
+              if (twoFa && twoFa.twoFactorEnabled) {
+                const isVerified = typeof window !== 'undefined' && 
+                  sessionStorage.getItem('2fa_verified_email') === user.email.toLowerCase();
+                if (!isVerified) {
+                  // User has not passed 2FA in this session. Require 2FA challenge.
+                  setAdminUser(null);
+                  setAuthLoading(false);
+                  return;
+                }
+              }
+            } catch (e) {
+              console.warn('2FA session status verify notice:', e);
+            }
+          }
           setAdminUser(user);
           setAuthLoading(false);
         }
@@ -379,8 +745,21 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
         }
       });
 
-    const unsubscribe = onAdminAuthStateChange((user) => {
+    const unsubscribe = onAdminAuthStateChange(async (user) => {
       if (mounted) {
+        if (user) {
+          try {
+            const twoFa = await get2FaStatus(user.email);
+            if (twoFa && twoFa.twoFactorEnabled) {
+              const isVerified = typeof window !== 'undefined' && 
+                sessionStorage.getItem('2fa_verified_email') === user.email.toLowerCase();
+              if (!isVerified) {
+                setAdminUser(null);
+                return;
+              }
+            }
+          } catch (e) {}
+        }
         setAdminUser(user);
       }
     });
@@ -393,6 +772,12 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
 
   // Handle Admin Sign Out
   const handleSignOut = async () => {
+    try {
+      if (typeof window !== 'undefined') {
+        sessionStorage.removeItem('2fa_verified_email');
+        sessionStorage.removeItem('2fa_pending_email');
+      }
+    } catch (e) {}
     await signOutAdmin();
     setAdminUser(null);
     showToast('Signed out of Supabase Admin Console.');
@@ -585,7 +970,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
       await createJob(jobData);
       showToast(`Published "${jobData.title}" live to Supabase.`);
     }
-    setEditingJob(null);
+    navigateToAdminPath('/admin/jobs');
   };
 
   // Handle Quick Status Switch
@@ -638,7 +1023,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
       await createCategory(data);
       showToast(`Department "${data.name}" created with slug /category/${data.slug}.`);
     }
-    setEditingCategory(null);
+    navigateToAdminPath('/admin/departments');
   };
 
   // Handle Delete Category
@@ -670,10 +1055,27 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
     if (userId) {
       await updateUser(userId, {
         fullName: data.fullName,
+        email: data.email,
         role: data.role,
         status: data.status,
         password: data.password
       });
+
+      // If the current logged-in admin updated their own email or details, sync active session state & 2FA cache
+      if (adminUser && (adminUser.id === userId || adminUser.email.toLowerCase() === editingUser?.email?.toLowerCase())) {
+        const updatedAdmin: AdminSessionUser = {
+          ...adminUser,
+          fullName: data.fullName,
+          email: data.email.toLowerCase(),
+          role: data.role
+        };
+        setAdminUser(updatedAdmin);
+        sessionStorage.setItem('2fa_verified_email', data.email.toLowerCase());
+        try {
+          localStorage.setItem('admin_user_cache', JSON.stringify(updatedAdmin));
+        } catch (e) {}
+      }
+
       showToast(`User account "${data.email}" updated successfully.`);
     } else {
       if (!data.password) {
@@ -687,7 +1089,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
       });
       showToast(`New user "${data.email}" provisioned and created in Supabase.`);
     }
-    setEditingUser(null);
+    navigateToAdminPath('/admin/users');
   };
 
   // Handle Delete User Confirm
@@ -722,12 +1124,22 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
     }
   };
 
+  const adminHeaderContent: Record<AdminTab, { title: string; description: string }> = {
+    home: { title: 'Home', description: 'Platform activity, recent listings, and operational health.' },
+    jobs: { title: 'Listings', description: 'Create, review, and organize job listings.' },
+    categories: { title: 'Departments', description: 'Manage job categories and candidate browse pages.' },
+    users: { title: 'Users & Access', description: 'Manage administrator accounts, roles, and access.' },
+    seo: { title: 'SEO Suite', description: 'Manage search appearance and indexing settings.' },
+    system: { title: 'Database Sync', description: 'Review database connectivity and maintenance actions.' },
+    profile: { title: 'Account Settings', description: 'Manage your profile and account security.' },
+  };
+
   if (authLoading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
         <span className="h-9 w-9 animate-spin rounded-full border-3 border-indigo-600 border-t-transparent dark:border-indigo-400" />
         <p className="mt-4 text-xs font-semibold text-slate-500 dark:text-slate-400">
-          Verifying Supabase administrative credentials...
+          Authenticating...
         </p>
       </div>
     );
@@ -739,6 +1151,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
         onLoginSuccess={(user) => {
           setAdminUser(user);
           showToast(`Welcome back, ${user.email}`);
+          navigateToAdminPath('/admin/home', false);
         }}
         onNavigate={onNavigate}
       />
@@ -891,30 +1304,44 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
               </p>
             )}
 
+            {/* Home Navigation Tab */}
+            <button
+              onClick={() => {
+                changeTab('home');
+                setIsMobileMenuOpen(false);
+              }}
+              className={`w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-xs font-semibold transition-all cursor-pointer ${
+                activeTab === 'home'
+                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/25 dark:bg-indigo-600'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/60 dark:hover:text-white'
+              } ${isSidebarCollapsed ? 'justify-center' : ''}`}
+              title="Executive Overview"
+            >
+              <LayoutDashboard className="h-4 w-4 shrink-0" />
+              {!isSidebarCollapsed && (
+                <div className="flex flex-1 items-center justify-between text-left truncate">
+                  <span>Home</span>
+                </div>
+              )}
+            </button>
+
             {/* Jobs Navigation Tab */}
             <button
               onClick={() => {
                 changeTab('jobs');
                 setIsMobileMenuOpen(false);
               }}
-              className={`w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-xs font-semibold transition-all ${
+              className={`w-full mt-1.5 flex items-center gap-3 rounded-xl px-3 py-2.5 text-xs font-semibold transition-all cursor-pointer ${
                 activeTab === 'jobs'
                   ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/25 dark:bg-indigo-600'
                   : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/60 dark:hover:text-white'
               } ${isSidebarCollapsed ? 'justify-center' : ''}`}
-              title="Manage Job Listings"
+              title="Manage Listings"
             >
-              <Briefcase className="h-4 w-4 shrink-0" />
+              <JobIcon className="h-4 w-4 shrink-0" />
               {!isSidebarCollapsed && (
                 <div className="flex flex-1 items-center justify-between text-left truncate">
-                  <span>Job Listings</span>
-                  <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold ${
-                    activeTab === 'jobs'
-                      ? 'bg-indigo-700 text-white'
-                      : 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
-                  }`}>
-                    {jobs.length}
-                  </span>
+                  <span>Listings</span>
                 </div>
               )}
             </button>
@@ -925,7 +1352,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
                 changeTab('categories');
                 setIsMobileMenuOpen(false);
               }}
-              className={`w-full mt-1.5 flex items-center gap-3 rounded-xl px-3 py-2.5 text-xs font-semibold transition-all ${
+              className={`w-full mt-1.5 flex items-center gap-3 rounded-xl px-3 py-2.5 text-xs font-semibold transition-all cursor-pointer ${
                 activeTab === 'categories'
                   ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/25 dark:bg-indigo-600'
                   : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/60 dark:hover:text-white'
@@ -936,13 +1363,6 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
               {!isSidebarCollapsed && (
                 <div className="flex flex-1 items-center justify-between text-left truncate">
                   <span>Departments</span>
-                  <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold ${
-                    activeTab === 'categories'
-                      ? 'bg-indigo-700 text-white'
-                      : 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
-                  }`}>
-                    {categories.length}
-                  </span>
                 </div>
               )}
             </button>
@@ -953,7 +1373,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
                 changeTab('users');
                 setIsMobileMenuOpen(false);
               }}
-              className={`w-full mt-1.5 flex items-center gap-3 rounded-xl px-3 py-2.5 text-xs font-semibold transition-all ${
+              className={`w-full mt-1.5 flex items-center gap-3 rounded-xl px-3 py-2.5 text-xs font-semibold transition-all cursor-pointer ${
                 activeTab === 'users'
                   ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/25 dark:bg-indigo-600'
                   : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/60 dark:hover:text-white'
@@ -964,13 +1384,27 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
               {!isSidebarCollapsed && (
                 <div className="flex flex-1 items-center justify-between text-left truncate">
                   <span>Users & Access</span>
-                  <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold ${
-                    activeTab === 'users'
-                      ? 'bg-indigo-700 text-white'
-                      : 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
-                  }`}>
-                    {users.length}
-                  </span>
+                </div>
+              )}
+            </button>
+
+            {/* SEO & Indexing Navigation Tab */}
+            <button
+              onClick={() => {
+                changeTab('seo');
+                setIsMobileMenuOpen(false);
+              }}
+              className={`w-full mt-1.5 flex items-center gap-3 rounded-xl px-3 py-2.5 text-xs font-semibold transition-all cursor-pointer ${
+                activeTab === 'seo'
+                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/25 dark:bg-indigo-600'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/60 dark:hover:text-white'
+              } ${isSidebarCollapsed ? 'justify-center' : ''}`}
+              title="SEO Suite & Search Engine Indexing"
+            >
+              <Globe className="h-4 w-4 shrink-0" />
+              {!isSidebarCollapsed && (
+                <div className="flex flex-1 items-center justify-between text-left truncate">
+                  <span>SEO Suite</span>
                 </div>
               )}
             </button>
@@ -981,7 +1415,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
                 changeTab('system');
                 setIsMobileMenuOpen(false);
               }}
-              className={`w-full mt-1.5 flex items-center gap-3 rounded-xl px-3 py-2.5 text-xs font-semibold transition-all ${
+              className={`w-full mt-1.5 flex items-center gap-3 rounded-xl px-3 py-2.5 text-xs font-semibold transition-all cursor-pointer ${
                 activeTab === 'system'
                   ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/25 dark:bg-indigo-600'
                   : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/60 dark:hover:text-white'
@@ -992,13 +1426,6 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
               {!isSidebarCollapsed && (
                 <div className="flex flex-1 items-center justify-between text-left truncate">
                   <span>Database Sync</span>
-                  <span className={`h-2 w-2 rounded-full ${
-                    supabaseConnected === true 
-                      ? 'bg-emerald-500 animate-pulse' 
-                      : supabaseConnected === false 
-                      ? 'bg-amber-500' 
-                      : 'bg-slate-400'
-                  }`} />
                 </div>
               )}
             </button>
@@ -1013,97 +1440,164 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
 
       {/* MAIN VIEWPORT CONTAINER - SCROLLABLE PAGE CONTENT */}
       <div className="flex-1 flex flex-col min-w-0 h-full overflow-y-auto">
-        
-        {/* TOP STATUS & CONTEXT BAR */}
-        <header className="sticky top-0 z-30 flex h-16 items-center border-b border-slate-200 bg-white/90 px-4 sm:px-6 lg:px-8 backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/90 transition-all duration-300">
-          <div className="w-full max-w-7xl mx-auto flex items-center justify-between gap-4">
-            
-            {/* Left: Mobile Toggle & Tab Breadcrumb */}
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => setIsMobileMenuOpen(true)}
-                className="md:hidden flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800"
-                aria-label="Open navigation menu"
-              >
-                <Menu className="h-4 w-4" />
-              </button>
+        {isJobEditorOpen && activeTab === 'jobs' ? (
+          <JobEditorPage
+            initialJob={editingJob}
+            categoriesList={availableCategoryNames}
+            onClose={() => {
+              navigateToAdminPath('/admin/jobs');
+            }}
+            onSubmit={handleJobFormSubmit}
+          />
+        ) : isCategoryEditorOpen && activeTab === 'categories' ? (
+          <CategoryEditorPage
+            initialCategory={editingCategory}
+            onClose={() => {
+              navigateToAdminPath('/admin/departments');
+            }}
+            onSubmit={handleCategorySubmit}
+          />
+        ) : isUserEditorOpen && activeTab === 'users' ? (
+          <UserEditorPage
+            initialUser={editingUser}
+            currentAdminEmail={adminUser?.email}
+            onClose={() => {
+              navigateToAdminPath('/admin/users');
+            }}
+            onSubmit={handleUserSubmit}
+          />
+        ) : (
+          <>
+            {/* TOP STATUS & CONTEXT BAR */}
+            <AdminHeader
+              title={adminHeaderContent[activeTab].title}
+              description={adminHeaderContent[activeTab].description}
+              onOpenMobileMenu={() => setIsMobileMenuOpen(true)}
+              actions={
+                <>
+                  {activeTab === 'jobs' && (
+                    <button
+                      onClick={() => navigateToAdminPath('/admin/add-new-job')}
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-indigo-500 transition-all cursor-pointer"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      <span>Post Job</span>
+                    </button>
+                  )}
+                  {activeTab === 'categories' && (
+                    <button
+                      onClick={() => {
+                        setEditingCategory(null);
+                        setIsCategoryEditorOpen(true);
+                      }}
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-indigo-500 transition-all cursor-pointer"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      <span>New Department</span>
+                    </button>
+                  )}
+                  {activeTab === 'users' && (
+                    <button
+                      onClick={() => navigateToAdminPath('/admin/add-new-user')}
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-indigo-500 transition-all cursor-pointer"
+                    >
+                      <UserPlus className="h-3.5 w-3.5" />
+                      <span>Add User</span>
+                    </button>
+                  )}
+                </>
+              }
+            />
 
-              <div>
-                <h1 className="text-base font-bold tracking-tight text-slate-900 dark:text-white capitalize">
-                  {activeTab === 'jobs' && 'Job Listings Management'}
-                  {activeTab === 'categories' && 'Departments & URL Slugs'}
-                  {activeTab === 'users' && 'Team & User Access Control'}
-                  {activeTab === 'profile' && 'Administrator Profile & Credentials'}
-                  {activeTab === 'system' && 'Database & System Settings'}
-                </h1>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 hidden sm:block">
-                  {activeTab === 'jobs' && 'Create, edit, spotlight, and publish open positions.'}
-                  {activeTab === 'categories' && 'Add, update, or remove departments and customize URL slugs.'}
-                  {activeTab === 'users' && 'Provision roles, manage administrative credentials, and audit users.'}
-                  {activeTab === 'profile' && 'Manage your account name, contact email, and administrative password.'}
-                  {activeTab === 'system' && 'Supabase PostgreSQL live connection and database synchronization.'}
-                </p>
-              </div>
-            </div>
+            {/* CONTENT AREA BASED ON ACTIVE TAB */}
+            <main className="flex-1 p-4 sm:p-6 lg:p-8">
+              <div className="w-full max-w-7xl mx-auto space-y-6 transition-all duration-300 ease-in-out">
 
-            {/* Right: Quick Contextual CTAs */}
-            <div className="flex items-center gap-2.5">
-              {/* Context Action Button */}
+              {/* TAB 0: HOME DASHBOARD */}
+              {activeTab === 'home' && (
+                <AdminHomeDashboard
+                  adminEmail={adminUser?.email}
+                  adminName={userDisplayName}
+                  jobs={jobs}
+                  categories={categories}
+                  users={users}
+                  supabaseConnected={Boolean(supabaseConnected)}
+                  onNavigate={(route) => {
+                    if (route.startsWith('/admin')) {
+                      navigateToAdminPath(route);
+                    } else {
+                      onNavigate(route);
+                    }
+                  }}
+                  onEditJob={(job) => {
+                    setEditingJob(job);
+                    navigateToAdminPath(`/admin/edit-job/${job.id}`);
+                  }}
+                />
+              )}
+
+              {/* TAB 1: JOBS MANAGEMENT */}
               {activeTab === 'jobs' && (
-                <button
-                  onClick={() => {
-                    setEditingJob(null);
-                    setIsJobModalOpen(true);
-                  }}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3.5 py-2 text-xs font-semibold text-white shadow-md shadow-indigo-600/20 hover:bg-indigo-500 transition-all hover:scale-[1.02] cursor-pointer"
-                >
-                  <Plus className="h-4 w-4" />
-                  <span>Post New Job</span>
-                </button>
-              )}
-
-              {activeTab === 'categories' && (
-                <button
-                  onClick={() => {
-                    setEditingCategory(null);
-                    setIsCategoryModalOpen(true);
-                  }}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3.5 py-2 text-xs font-semibold text-white shadow-md shadow-indigo-600/20 hover:bg-indigo-500 transition-all hover:scale-[1.02] cursor-pointer"
-                >
-                  <Plus className="h-4 w-4" />
-                  <span>Add Department</span>
-                </button>
-              )}
-            </div>
-          </div>
-        </header>
-
-        {/* CONTENT AREA BASED ON ACTIVE TAB */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8">
-          <div className="w-full max-w-7xl mx-auto space-y-6 transition-all duration-300 ease-in-out">
-
-          {/* TAB 1: JOBS MANAGEMENT */}
-          {activeTab === 'jobs' && (
-            <div className="space-y-6 animate-in fade-in duration-200">
+                <div className="space-y-6 animate-in fade-in duration-200">
               
               {/* Analytics Metric Cards */}
               <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+                <div 
+                  onClick={() => {
+                    setStatusFilter('all');
+                    navigateToAdminPath('/admin/jobs?status=all');
+                  }}
+                  className={`rounded-2xl border p-4 shadow-xs cursor-pointer transition-all ${
+                    statusFilter === 'all'
+                      ? 'border-indigo-400 bg-indigo-50/50 ring-2 ring-indigo-500/20 dark:bg-indigo-950/40 dark:border-indigo-700'
+                      : 'border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 hover:border-indigo-300'
+                  }`}
+                >
                   <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Total Listings</p>
                   <p className="mt-1 text-2xl font-extrabold text-slate-900 dark:text-white">{stats.total}</p>
                 </div>
 
-                <div className="rounded-2xl border border-emerald-200/80 bg-emerald-50/40 p-4 shadow-xs dark:border-emerald-950/60 dark:bg-emerald-950/20">
+                <div 
+                  onClick={() => {
+                    setStatusFilter('published');
+                    navigateToAdminPath('/admin/jobs?status=published');
+                  }}
+                  className={`rounded-2xl border p-4 shadow-xs cursor-pointer transition-all ${
+                    statusFilter === 'published'
+                      ? 'border-emerald-400 bg-emerald-100/60 ring-2 ring-emerald-500/20 dark:bg-emerald-950/60 dark:border-emerald-700'
+                      : 'border-emerald-200/80 bg-emerald-50/40 dark:border-emerald-950/60 dark:bg-emerald-950/20 hover:border-emerald-300'
+                  }`}
+                >
                   <p className="text-[11px] font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">Published Live</p>
                   <p className="mt-1 text-2xl font-extrabold text-emerald-700 dark:text-emerald-300">{stats.published}</p>
                 </div>
 
-                <div className="rounded-2xl border border-amber-200/80 bg-amber-50/40 p-4 shadow-xs dark:border-amber-950/60 dark:bg-amber-950/20">
+                <div 
+                  onClick={() => {
+                    setStatusFilter('draft');
+                    navigateToAdminPath('/admin/jobs?status=draft');
+                  }}
+                  className={`rounded-2xl border p-4 shadow-xs cursor-pointer transition-all ${
+                    statusFilter === 'draft'
+                      ? 'border-amber-400 bg-amber-100/60 ring-2 ring-amber-500/20 dark:bg-amber-950/60 dark:border-amber-700'
+                      : 'border-amber-200/80 bg-amber-50/40 dark:border-amber-950/60 dark:bg-amber-950/20 hover:border-amber-300'
+                  }`}
+                >
                   <p className="text-[11px] font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-400">Drafts</p>
                   <p className="mt-1 text-2xl font-extrabold text-amber-700 dark:text-amber-300">{stats.draft}</p>
                 </div>
 
-                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+                <div 
+                  onClick={() => {
+                    setStatusFilter('archived');
+                    navigateToAdminPath('/admin/jobs?status=archived');
+                  }}
+                  className={`rounded-2xl border p-4 shadow-xs cursor-pointer transition-all ${
+                    statusFilter === 'archived'
+                      ? 'border-slate-400 bg-slate-100 ring-2 ring-slate-500/20 dark:bg-slate-800 dark:border-slate-600'
+                      : 'border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 hover:border-slate-300'
+                  }`}
+                >
                   <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Archived</p>
                   <p className="mt-1 text-2xl font-extrabold text-slate-700 dark:text-slate-300">{stats.archived}</p>
                 </div>
@@ -1148,7 +1642,11 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
                     {/* Status Filter */}
                     <select
                       value={statusFilter}
-                      onChange={(e) => setStatusFilter(e.target.value as any)}
+                      onChange={(e) => {
+                        const newStatus = e.target.value as any;
+                        setStatusFilter(newStatus);
+                        navigateToAdminPath(`/admin/jobs${newStatus !== 'all' ? `?status=${newStatus}` : ''}`);
+                      }}
                       className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 focus:border-indigo-500 focus:outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300"
                     >
                       <option value="all">All Statuses</option>
@@ -1204,7 +1702,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
                   </div>
                 ) : filteredJobs.length === 0 ? (
                   <div className="flex flex-col items-center justify-center p-12 text-center">
-                    <Briefcase className="h-10 w-10 text-slate-300 dark:text-slate-700" />
+                    <JobIcon className="h-10 w-10 text-slate-300 dark:text-slate-700" />
                     <p className="mt-3 text-sm font-semibold text-slate-700 dark:text-slate-300">No job listings found</p>
                     <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                       {searchQuery || statusFilter !== 'all' || selectedCategoryFilter !== 'all'
@@ -1212,10 +1710,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
                         : 'Get started by creating your first job listing.'}
                     </p>
                     <button
-                      onClick={() => {
-                        setEditingJob(null);
-                        setIsJobModalOpen(true);
-                      }}
+                      onClick={() => navigateToAdminPath('/admin/add-new-job')}
                       className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-500"
                     >
                       <Plus className="h-4 w-4" />
@@ -1342,7 +1837,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
                                   <button
                                     onClick={() => {
                                       setEditingJob(job);
-                                      setIsJobModalOpen(true);
+                                      navigateToAdminPath(`/admin/edit-job/${job.id}`);
                                     }}
                                     className="rounded-lg p-1.5 text-indigo-600 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-950/50 transition-colors"
                                     title="Edit listing"
@@ -1376,30 +1871,6 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
           {activeTab === 'categories' && (
             <div className="space-y-6 animate-in fade-in duration-200">
               
-              {/* Category Management Info Card */}
-              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <div>
-                  <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                    <FolderTree className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
-                    <span>Job Departments & URL Slugs</span>
-                  </h2>
-                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 max-w-2xl">
-                    Configure classifications, department descriptions, and SEO-friendly URL slugs (<code className="rounded bg-slate-100 px-1 py-0.5 text-[11px] font-mono text-indigo-600 dark:bg-slate-800 dark:text-indigo-300">/category/:slug</code>). Real-time changes sync directly to Supabase.
-                  </p>
-                </div>
-
-                <button
-                  onClick={() => {
-                    setEditingCategory(null);
-                    setIsCategoryModalOpen(true);
-                  }}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-semibold text-white shadow-md shadow-indigo-600/20 hover:bg-indigo-500 transition-all shrink-0"
-                >
-                  <Plus className="h-4 w-4" />
-                  <span>New Department</span>
-                </button>
-              </div>
-
               {/* Search & Stats Filter */}
               <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
                 <div className="relative flex-1 max-w-md">
@@ -1441,11 +1912,8 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
                       {categorySearch ? 'Try a different search keyword.' : 'Add your first job department to get started.'}
                     </p>
                     <button
-                      onClick={() => {
-                        setEditingCategory(null);
-                        setIsCategoryModalOpen(true);
-                      }}
-                      className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-500"
+                      onClick={() => navigateToAdminPath('/admin/add-new-department')}
+                      className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-500 cursor-pointer"
                     >
                       <Plus className="h-4 w-4" />
                       <span>Add Department</span>
@@ -1527,9 +1995,9 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
                                   <button
                                     onClick={() => {
                                       setEditingCategory(cat);
-                                      setIsCategoryModalOpen(true);
+                                      navigateToAdminPath(`/admin/edit-department/${cat.id}`);
                                     }}
-                                    className="rounded-lg p-1.5 text-indigo-600 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-950/50 transition-colors"
+                                    className="rounded-lg p-1.5 text-indigo-600 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-950/50 transition-colors cursor-pointer"
                                     title="Edit department name and URL slug"
                                   >
                                     <Edit3 className="h-4 w-4" />
@@ -1561,30 +2029,6 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
           {activeTab === 'users' && (
             <div className="space-y-6 animate-in fade-in duration-200">
               
-              {/* Users Header Info Card */}
-              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <div>
-                  <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                    <Users className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
-                    <span>Team & User Access Control</span>
-                  </h2>
-                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 max-w-2xl">
-                    Provision administrator accounts, assign security roles, and manage access to the inaquired console. All users are authenticated directly against Supabase Auth.
-                  </p>
-                </div>
-
-                <button
-                  onClick={() => {
-                    setEditingUser(null);
-                    setIsUserModalOpen(true);
-                  }}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-semibold text-white shadow-md shadow-indigo-600/20 hover:bg-indigo-500 transition-all shrink-0"
-                >
-                  <UserPlus className="h-4 w-4" />
-                  <span>Add User</span>
-                </button>
-              </div>
-
               {/* Quick Metrics Bar */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-900">
@@ -1606,7 +2050,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
                 <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-900">
                   <div className="flex items-center justify-between">
                     <span className="text-[11px] font-semibold text-emerald-600 uppercase tracking-wider dark:text-emerald-400">Recruiters</span>
-                    <Briefcase className="h-4 w-4 text-emerald-500" />
+                    <JobIcon className="h-4 w-4 text-emerald-500" />
                   </div>
                   <p className="mt-2 text-xl font-extrabold text-emerald-600 dark:text-emerald-400">{userStats.recruiters}</p>
                 </div>
@@ -1683,11 +2127,8 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
                       {userSearch ? 'Try a different search query or reset filters.' : 'Add your first administrator or team member.'}
                     </p>
                     <button
-                      onClick={() => {
-                        setEditingUser(null);
-                        setIsUserModalOpen(true);
-                      }}
-                      className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-500"
+                      onClick={() => navigateToAdminPath('/admin/add-new-user')}
+                      className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-500 cursor-pointer"
                     >
                       <UserPlus className="h-4 w-4" />
                       <span>Add User</span>
@@ -1780,9 +2221,9 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
                                   <button
                                     onClick={() => {
                                       setEditingUser(u);
-                                      setIsUserModalOpen(true);
+                                      navigateToAdminPath(`/admin/edit-user/${u.id}`);
                                     }}
-                                    className="rounded-lg p-1.5 text-indigo-600 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-950/50 transition-colors"
+                                    className="rounded-lg p-1.5 text-indigo-600 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-950/50 transition-colors cursor-pointer"
                                     title="Edit user details, role or reset password"
                                   >
                                     <Edit3 className="h-4 w-4" />
@@ -1811,7 +2252,12 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
             </div>
           )}
 
-          {/* TAB 4: SYSTEM & DATABASE SETTINGS */}
+          {/* TAB 4: SEO SUITE & SEARCH ENGINE INDEXING */}
+          {activeTab === 'seo' && (
+            <SeoPanel onShowToast={showToast} />
+          )}
+
+          {/* TAB 5: SYSTEM & DATABASE SETTINGS */}
           {activeTab === 'system' && (
             <div className="space-y-6 animate-in fade-in duration-200 max-w-4xl">
               
@@ -1921,19 +2367,9 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
           onNavigate={onNavigate}
           supabaseConnected={supabaseConnected}
         />
+        </>
+      )}
       </div>
-
-      {/* CREATE / EDIT JOB MODAL */}
-      <JobFormModal
-        isOpen={isJobModalOpen}
-        onClose={() => {
-          setIsJobModalOpen(false);
-          setEditingJob(null);
-        }}
-        onSubmit={handleJobFormSubmit}
-        initialJob={editingJob}
-        categoriesList={availableCategoryNames}
-      />
 
       {/* DELETE JOB CONFIRM MODAL */}
       <DeleteConfirmModal
@@ -1947,17 +2383,6 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
         isDeleting={isDeletingJob}
       />
 
-      {/* CREATE / EDIT CATEGORY MODAL */}
-      <CategoryModal
-        isOpen={isCategoryModalOpen}
-        onClose={() => {
-          setIsCategoryModalOpen(false);
-          setEditingCategory(null);
-        }}
-        onSubmit={handleCategorySubmit}
-        initialCategory={editingCategory}
-      />
-
       {/* DELETE CATEGORY CONFIRM MODAL */}
       <DeleteCategoryModal
         isOpen={isDeleteCategoryModalOpen}
@@ -1969,18 +2394,6 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
         onConfirm={handleDeleteCategoryConfirm}
         isDeleting={isDeletingCategory}
         jobCount={deletingCategory ? categoryJobCounts[deletingCategory.name] || 0 : 0}
-      />
-
-      {/* CREATE / EDIT USER MODAL */}
-      <UserModal
-        isOpen={isUserModalOpen}
-        onClose={() => {
-          setIsUserModalOpen(false);
-          setEditingUser(null);
-        }}
-        onSubmit={handleUserSubmit}
-        initialUser={editingUser}
-        currentAdminEmail={adminUser?.email}
       />
 
       {/* DELETE USER CONFIRM MODAL */}

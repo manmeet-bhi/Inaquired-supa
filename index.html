@@ -36,23 +36,64 @@
     <script>
       (function() {
         try {
-          var saved = localStorage.getItem('inaquired_theme');
+          var saved = localStorage.getItem('inaquired_theme') || localStorage.getItem('theme');
+          if (!saved) {
+            var match = document.cookie.match(/inaquired_theme=([^;]+)/);
+            if (match) saved = match[1];
+          }
           var isDark = saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          var root = document.documentElement;
           if (isDark) {
-            document.documentElement.classList.add('dark');
-            document.documentElement.setAttribute('data-theme', 'dark');
-            document.documentElement.style.colorScheme = 'dark';
+            root.classList.add('dark');
+            root.setAttribute('data-theme', 'dark');
+            root.style.colorScheme = 'dark';
           } else {
-            document.documentElement.classList.remove('dark');
-            document.documentElement.setAttribute('data-theme', 'light');
-            document.documentElement.style.colorScheme = 'light';
+            root.classList.remove('dark');
+            root.setAttribute('data-theme', 'light');
+            root.style.colorScheme = 'light';
           }
         } catch(e) {}
       })();
     </script>
   </head>
-  <body class="bg-slate-50 text-slate-900 antialiased dark:bg-slate-950 dark:text-slate-100 min-h-screen">
+  <body>
     <div id="root"></div>
+
+    <!-- Netlify Forms Pre-rendering Detection (Required for React / Vite SPA) -->
+    <form name="contact" netlify netlify-honeypot="bot-field" hidden>
+      <input type="hidden" name="form-name" value="contact" />
+      <input type="text" name="bot-field" />
+      <input type="text" name="name" />
+      <input type="email" name="email" />
+      <input type="text" name="subject" />
+      <textarea name="message"></textarea>
+    </form>
+
+    <form name="post-a-job" netlify netlify-honeypot="bot-field" hidden>
+      <input type="hidden" name="form-name" value="post-a-job" />
+      <input type="text" name="bot-field" />
+      <input type="text" name="employer_name" />
+      <input type="email" name="employer_email" />
+      <input type="text" name="company_name" />
+      <input type="text" name="company_website" />
+      <input type="text" name="title" />
+      <input type="text" name="category" />
+      <input type="text" name="work_arrangement" />
+      <input type="text" name="job_type" />
+      <input type="text" name="experience_level" />
+      <input type="text" name="location" />
+      <input type="text" name="salary_min" />
+      <input type="text" name="salary_max" />
+      <input type="text" name="currency" />
+      <input type="text" name="application_url" />
+      <input type="text" name="application_deadline" />
+      <input type="text" name="tags" />
+      <textarea name="description"></textarea>
+      <textarea name="responsibilities"></textarea>
+      <textarea name="requirements"></textarea>
+      <textarea name="benefits"></textarea>
+    </form>
+
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

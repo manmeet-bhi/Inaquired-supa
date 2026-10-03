@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, Suspense, lazy } from 'react';
 import { ThemeProvider } from './context/ThemeContext';
 import { Navbar } from './components/layout/Navbar';
 import { Footer } from './components/layout/Footer';
+import { CookieBanner } from './components/layout/CookieBanner';
 import { Job } from './types/job';
 import { 
   subscribeToPublishedJobs 
@@ -13,8 +14,10 @@ const CategoryJobsPage = lazy(() => import('./pages/CategoryJobsPage').then(m =>
 const JobDetailPage = lazy(() => import('./pages/JobDetailPage').then(m => ({ default: m.JobDetailPage })));
 const AboutPage = lazy(() => import('./pages/AboutPage').then(m => ({ default: m.AboutPage })));
 const ContactPage = lazy(() => import('./pages/ContactPage').then(m => ({ default: m.ContactPage })));
+const PostAJobPage = lazy(() => import('./pages/PostAJobPage').then(m => ({ default: m.PostAJobPage })));
 const PrivacyPolicyPage = lazy(() => import('./pages/PrivacyPolicyPage').then(m => ({ default: m.PrivacyPolicyPage })));
 const TermsPage = lazy(() => import('./pages/TermsPage').then(m => ({ default: m.TermsPage })));
+const CookiePolicyPage = lazy(() => import('./pages/CookiePolicyPage').then(m => ({ default: m.CookiePolicyPage })));
 const DepartmentsPage = lazy(() => import('./pages/DepartmentsPage').then(m => ({ default: m.DepartmentsPage })));
 const CompaniesPage = lazy(() => import('./pages/CompaniesPage').then(m => ({ default: m.CompaniesPage })));
 const AdminPage = lazy(() => import('./pages/admin/AdminPage').then(m => ({ default: m.AdminPage })));
@@ -216,12 +219,20 @@ function MainApp() {
       return <ContactPage onNavigate={navigate} />;
     }
 
+    if (currentPath === '/post-a-job' || currentPath === '/post-job') {
+      return <PostAJobPage onNavigate={navigate} />;
+    }
+
     if (currentPath === '/privacy') {
       return <PrivacyPolicyPage onNavigate={navigate} />;
     }
 
     if (currentPath === '/terms') {
       return <TermsPage onNavigate={navigate} />;
+    }
+
+    if (currentPath === '/cookies' || currentPath === '/cookie-policy') {
+      return <CookiePolicyPage onNavigate={navigate} />;
     }
 
     return (
@@ -278,6 +289,7 @@ function MainApp() {
       </main>
 
       <Footer onNavigate={navigate} />
+      <CookieBanner onNavigate={navigate} />
     </div>
   );
 }

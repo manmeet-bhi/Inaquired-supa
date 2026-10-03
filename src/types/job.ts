@@ -31,6 +31,9 @@ export interface Job {
   createdBy?: string;
   seoTitle?: string;
   seoDescription?: string;
+  seoImageUrl?: string;
+  canonicalUrl?: string;
+  noIndex?: boolean;
 }
 
 export interface JobFiltersState {

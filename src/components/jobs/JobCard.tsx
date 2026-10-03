@@ -1,5 +1,6 @@
 import React from 'react';
-import { MapPin, Briefcase, Clock, DollarSign, ArrowUpRight, Sparkles } from 'lucide-react';
+import { MapPin, Clock, DollarSign, ArrowUpRight, Sparkles } from 'lucide-react';
+import { JobIcon } from '../icons/JobIcon';
 import { Job } from '../../types/job';
 import { formatSalary, formatRelativeDate } from '../../utils/jobUtils';
 

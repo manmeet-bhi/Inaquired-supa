@@ -11,13 +11,13 @@ const getEnvVar = (key: string, defaultValue: string): string => {
 };
 
 export const SUPABASE_URL = 
-  getEnvVar('VITE_SUPABASE_URL', 'https://wnpsrdtlqxfiglhmalwq.supabase.co');
+  getEnvVar('VITE_SUPABASE_URL', '');
 
 export const SUPABASE_ANON_KEY = 
-  getEnvVar('VITE_SUPABASE_ANON_KEY', 'sb_publishable_n2im84IXBbQ3v2XluipN6Q_N_gfjbhu');
+  getEnvVar('VITE_SUPABASE_ANON_KEY', '');
 
 export const SUPABASE_STORAGE_URL =
-  getEnvVar('VITE_SUPABASE_STORAGE_URL', 'https://wnpsrdtlqxfiglhmalwq.storage.supabase.co/storage/v1/s3');
+  getEnvVar('VITE_SUPABASE_STORAGE_URL', '');
 
 export const SUPABASE_STORAGE_REGION =
   getEnvVar('VITE_SUPABASE_STORAGE_REGION', 'ap-northeast-1');

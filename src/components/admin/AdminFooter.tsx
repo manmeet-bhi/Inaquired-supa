@@ -34,11 +34,8 @@ export const AdminFooter: React.FC<AdminFooterProps> = () => {
     <footer className="mt-auto border-t border-slate-200/80 bg-white/70 py-4 px-4 sm:px-8 backdrop-blur-xs dark:border-slate-800/80 dark:bg-slate-900/60 transition-colors">
       <div className="w-full max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-3 items-center gap-3">
         
-        {/* Left Column: Subtle Status Indicator */}
-        <div className="hidden sm:flex items-center gap-2 text-[11px] text-slate-400 dark:text-slate-500">
-          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-          <span className="font-mono text-[10px] uppercase tracking-wider">Console Online</span>
-        </div>
+        {/* Left Column: Spacer to preserve center branding alignment */}
+        <div className="hidden sm:block" />
 
         {/* Center Column: Minimal Branding */}
         <div className="flex items-center justify-center gap-2">

@@ -17,14 +17,14 @@ export function generateJobSlug(title: string, companyName: string): string {
  * Formats salary into a human-readable display
  */
 export function formatSalary(min?: number, max?: number, currency: string = 'USD'): string {
-  if (!min && !max) return 'Competitive compensation';
-  const symbol = currency === 'USD' ? '$' : currency === 'EUR' ? '€' : currency === 'GBP' ? '£' : `${currency} `;
+  if (!min && !max) return 'Not disclosed';
+  const symbol = currency === 'USD' ? '$' : currency === 'EUR' ? '€' : currency === 'GBP' ? '£' : currency === 'INR' ? '₹' : currency === 'CAD' ? 'CA$' : currency === 'AUD' ? 'A$' : `${currency} `;
   
   if (min && max) {
     return `${symbol}${min.toLocaleString('en-US')} - ${symbol}${max.toLocaleString('en-US')} / yr`;
   }
   if (min) {
-    return `From ${symbol}${min.toLocaleString('en-US')} / yr`;
+    return `${symbol}${min.toLocaleString('en-US')} / yr`;
   }
   return `Up to ${symbol}${max?.toLocaleString('en-US')} / yr`;
 }

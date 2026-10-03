@@ -17,6 +17,16 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (saved === 'light' || saved === 'dark') {
         return saved;
       }
+      const fallback = localStorage.getItem('theme') as Theme | null;
+      if (fallback === 'light' || fallback === 'dark') {
+        return fallback;
+      }
+      try {
+        const cookieMatch = document.cookie.match(/inaquired_theme=([^;]+)/);
+        if (cookieMatch && (cookieMatch[1] === 'light' || cookieMatch[1] === 'dark')) {
+          return cookieMatch[1] as Theme;
+        }
+      } catch (e) {}
       if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
         return 'dark';
       }
@@ -24,10 +34,11 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return 'light';
   });
 
-  useEffect(() => {
+  const applyThemeToDOM = (t: Theme) => {
+    if (typeof document === 'undefined') return;
     const root = document.documentElement;
     const body = document.body;
-    if (theme === 'dark') {
+    if (t === 'dark') {
       root.classList.add('dark');
       root.setAttribute('data-theme', 'dark');
       root.style.colorScheme = 'dark';
@@ -44,14 +55,50 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         body.setAttribute('data-theme', 'light');
       }
     }
-    localStorage.setItem('inaquired_theme', theme);
+  };
+
+  const persistTheme = (t: Theme) => {
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem('inaquired_theme', t);
+      localStorage.setItem('theme', t);
+      document.cookie = `inaquired_theme=${t};path=/;max-age=31536000;SameSite=Lax`;
+    } catch (e) {
+      console.warn('Failed to persist theme:', e);
+    }
+  };
+
+  useEffect(() => {
+    applyThemeToDOM(theme);
+    persistTheme(theme);
   }, [theme]);
 
+  // Sync theme changes across browser tabs
+  useEffect(() => {
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === 'inaquired_theme' || e.key === 'theme') {
+        const val = e.newValue as Theme | null;
+        if (val === 'light' || val === 'dark') {
+          setThemeState(val);
+        }
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, []);
+
   const toggleTheme = () => {
-    setThemeState((prev) => (prev === 'light' ? 'dark' : 'light'));
+    setThemeState((prev) => {
+      const next = prev === 'light' ? 'dark' : 'light';
+      applyThemeToDOM(next);
+      persistTheme(next);
+      return next;
+    });
   };
 
   const setTheme = (newTheme: Theme) => {
+    applyThemeToDOM(newTheme);
+    persistTheme(newTheme);
     setThemeState(newTheme);
   };
 

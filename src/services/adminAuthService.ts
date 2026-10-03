@@ -13,6 +13,24 @@ export interface UpdateAdminProfileData {
   password?: string;
 }
 
+async function getActiveAdmin(userId: string): Promise<AdminSessionUser | null> {
+  const { data, error } = await supabase
+    .from('admin_users')
+    .select('id, email, full_name, role, status')
+    .eq('id', userId)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data || data.status !== 'active') return null;
+
+  return {
+    id: data.id,
+    email: data.email,
+    role: data.role,
+    fullName: data.full_name || '',
+  };
+}
+
 /**
  * Retrieves the currently active admin session from Supabase
  */
@@ -20,13 +38,7 @@ export async function getAdminSession(): Promise<AdminSessionUser | null> {
   try {
     const { data: { session }, error } = await supabase.auth.getSession();
     if (!error && session?.user) {
-      const metadata = session.user.user_metadata || {};
-      return {
-        id: session.user.id,
-        email: session.user.email || '',
-        role: (metadata.role as string) || 'admin',
-        fullName: (metadata.full_name as string) || (metadata.name as string) || '',
-      };
+      return await getActiveAdmin(session.user.id);
     }
   } catch (err) {
     console.warn('Supabase getSession notice:', err);
@@ -53,13 +65,13 @@ export async function signInAdmin(email: string, password: string): Promise<Admi
     throw new Error('No user returned by Supabase authentication.');
   }
 
-  const metadata = data.user.user_metadata || {};
-  return {
-    id: data.user.id,
-    email: data.user.email || cleanEmail,
-    role: (metadata.role as string) || 'admin',
-    fullName: (metadata.full_name as string) || (metadata.name as string) || '',
-  };
+  const admin = await getActiveAdmin(data.user.id);
+  if (!admin) {
+    await supabase.auth.signOut();
+    throw new Error('This account is not an active administrator.');
+  }
+
+  return admin;
 }
 
 /**
@@ -71,39 +83,47 @@ export async function updateAdminProfile(data: UpdateAdminProfileData): Promise<
   if (data.fullName !== undefined) {
     updates.data = { full_name: data.fullName.trim(), name: data.fullName.trim() };
   }
-  if (data.email && data.email.trim()) {
-    updates.email = data.email.trim().toLowerCase();
-  }
   if (data.password && data.password.trim().length >= 6) {
     updates.password = data.password.trim();
   }
 
-  const { data: res, error } = await supabase.auth.updateUser(updates);
-  if (error) {
-    throw error;
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    throw new Error('No authenticated administrator session found.');
   }
 
-  if (!res.user) {
-    throw new Error('Failed to update profile.');
+  const cleanEmail = (data.email && data.email.trim()) ? data.email.trim().toLowerCase() : (user.email || '');
+
+  // Execute admin_update_user stored procedure for immediate auth.users & admin_users email consistency
+  const { error: rpcError } = await supabase.rpc('admin_update_user', {
+    p_user_id: user.id,
+    p_full_name: data.fullName !== undefined ? data.fullName.trim() : null,
+    p_email: cleanEmail,
+    p_password: data.password && data.password.trim().length >= 6 ? data.password.trim() : null
+  });
+
+  if (rpcError) {
+    throw new Error(rpcError.message);
   }
 
-  // Also sync with public.admin_users if present
+  // Update auth session metadata
   try {
-    const tableUpdate: any = { updated_at: new Date().toISOString() };
-    if (data.fullName !== undefined) tableUpdate.full_name = data.fullName.trim();
-    if (data.email) tableUpdate.email = data.email.trim().toLowerCase();
-    await supabase.from('admin_users').update(tableUpdate).eq('id', res.user.id);
-  } catch (syncErr) {
-    // Non-blocking sync warning
-    console.warn('admin_users table sync notice:', syncErr);
+    await supabase.auth.updateUser(updates);
+  } catch (authErr) {
+    console.warn('supabase.auth.updateUser notice:', authErr);
   }
 
-  const metadata = res.user.user_metadata || {};
+  // Synchronize 2FA verified session cache
+  if (typeof sessionStorage !== 'undefined') {
+    sessionStorage.setItem('2fa_verified_email', cleanEmail);
+  }
+
+  const metadata = user.user_metadata || {};
   return {
-    id: res.user.id,
-    email: res.user.email || (data.email ? data.email.trim().toLowerCase() : ''),
+    id: user.id,
+    email: cleanEmail,
     role: (metadata.role as string) || 'admin',
-    fullName: (metadata.full_name as string) || (metadata.name as string) || (data.fullName?.trim() || ''),
+    fullName: data.fullName !== undefined ? data.fullName.trim() : ((metadata.full_name as string) || ''),
   };
 }
 
@@ -122,18 +142,15 @@ export async function signOutAdmin(): Promise<void> {
  * Subscribes to Supabase authentication state changes
  */
 export function onAdminAuthStateChange(callback: (user: AdminSessionUser | null) => void): () => void {
-  const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-    if (session?.user) {
-      const metadata = session.user.user_metadata || {};
-      callback({
-        id: session.user.id,
-        email: session.user.email || '',
-        role: (metadata.role as string) || 'admin',
-        fullName: (metadata.full_name as string) || (metadata.name as string) || '',
-      });
-    } else {
+  const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    if (!session?.user) {
       callback(null);
+      return;
     }
+
+    void getActiveAdmin(session.user.id)
+      .then(callback)
+      .catch(() => callback(null));
   });
 
   return () => {

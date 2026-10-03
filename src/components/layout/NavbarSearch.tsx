@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, X, MapPin, DollarSign, ArrowRight, Briefcase } from 'lucide-react';
+import { Search, X, MapPin, DollarSign, ArrowRight, Database } from 'lucide-react';
+import { JobIcon } from '../icons/JobIcon';
 import { Job } from '../../types/job';
 import { searchJobsByKeyword, formatSalary } from '../../utils/jobUtils';
+import { searchJobsInDatabase } from '../../services/jobService';
 
 interface NavbarSearchProps {
   jobs: Job[];
@@ -20,12 +22,43 @@ export const NavbarSearch: React.FC<NavbarSearchProps> = ({
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState<number>(-1);
+  const [dbResults, setDbResults] = useState<Job[]>([]);
+  const [isSearchingDb, setIsSearchingDb] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Real-time matches based on title or company keywords
-  const matchingJobs = searchJobsByKeyword(jobs, keyword);
-  const visibleMatches = matchingJobs.slice(0, 5);
+  // Debounced real-time database query
+  useEffect(() => {
+    const trimmed = keyword.trim();
+    if (trimmed.length < 2) {
+      setDbResults([]);
+      setIsSearchingDb(false);
+      return;
+    }
+
+    setIsSearchingDb(true);
+    const timer = setTimeout(async () => {
+      try {
+        const results = await searchJobsInDatabase(trimmed, 8);
+        setDbResults(results);
+      } catch (err) {
+        console.warn('Real-time database search error:', err);
+      } finally {
+        setIsSearchingDb(false);
+      }
+    }, 180);
+
+    return () => clearTimeout(timer);
+  }, [keyword]);
+
+  // Merge in-memory matches with real-time database results (deduplicating by ID)
+  const localMatches = searchJobsByKeyword(jobs, keyword);
+  const combinedMap = new Map<string, Job>();
+  localMatches.forEach((j) => combinedMap.set(j.id, j));
+  dbResults.forEach((j) => combinedMap.set(j.id, j));
+
+  const matchingJobs = Array.from(combinedMap.values());
+  const visibleMatches = matchingJobs.slice(0, 6);
 
   // Close dropdown on click outside
   useEffect(() => {
@@ -148,14 +181,17 @@ export const NavbarSearch: React.FC<NavbarSearchProps> = ({
         <div className="absolute left-0 right-0 top-full mt-1.5 z-50 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-900 animate-in fade-in-50 zoom-in-95 duration-100">
           
           <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/70 px-3.5 py-2 text-[11px] font-semibold text-slate-500 dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-400">
-            <span>Real-time Matches</span>
+            <span className="flex items-center gap-1.5">
+              <Database className="h-3 w-3 text-indigo-500" />
+              <span>{isSearchingDb ? 'Querying database...' : 'Database Matches'}</span>
+            </span>
             <span>{matchingJobs.length} {matchingJobs.length === 1 ? 'opening' : 'openings'}</span>
           </div>
 
           <div className="max-h-72 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800/60">
             {matchingJobs.length === 0 ? (
               <div className="p-4 text-center">
-                <Briefcase className="mx-auto h-6 w-6 text-slate-300 dark:text-slate-600 mb-1.5" />
+                <JobIcon className="mx-auto h-6 w-6 text-slate-300 dark:text-slate-600 mb-1.5" />
                 <p className="text-xs font-medium text-slate-700 dark:text-slate-300">
                   No matching jobs found
                 </p>

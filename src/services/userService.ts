@@ -27,7 +27,7 @@ export async function getUsers(): Promise<ManagedUser[]> {
   try {
     const { data, error } = await supabase
       .from('admin_users')
-      .select('*')
+      .select('id, email, full_name, role, status, last_sign_in_at, created_at, updated_at')
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -121,6 +121,7 @@ export async function updateUser(userId: string, data: UpdateUserData): Promise<
   const payload: any = {
     p_user_id: userId,
     p_full_name: data.fullName?.trim() || null,
+    p_email: data.email?.trim().toLowerCase() || null,
     p_role: data.role || null,
     p_status: data.status || null,
     p_password: data.password && data.password.trim().length >= 6 ? data.password.trim() : null

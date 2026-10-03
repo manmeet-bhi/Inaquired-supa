@@ -3,19 +3,26 @@ import {
   Search, 
   Sparkles, 
   ArrowRight, 
-  Briefcase, 
   Globe2, 
   GraduationCap, 
   Building2, 
   Laptop, 
-  CheckCircle2, 
-  BellRing 
+  CheckCircle2,
+  Code2,
+  Palette,
+  TrendingUp,
+  Database,
+  DollarSign,
+  Settings,
+  Users,
+  Headphones
 } from 'lucide-react';
+import { JobIcon } from '../components/icons/JobIcon';
 import { Job, JobFiltersState } from '../types/job';
 import { JobCard } from '../components/jobs/JobCard';
 import { JobFilters } from '../components/jobs/JobFilters';
 import { filterJobs } from '../utils/jobUtils';
-import { requestJobNotifications, checkNotificationSupport } from '../services/notificationService';
+import { searchJobsInDatabase } from '../services/jobService';
 
 interface HomePageProps {
   jobs: Job[];
@@ -44,10 +51,35 @@ export const HomePage: React.FC<HomePageProps> = ({
     sortBy: 'newest',
   });
 
+  const [dbSearchResults, setDbSearchResults] = useState<Job[]>([]);
+  const [isSearchingDb, setIsSearchingDb] = useState(false);
+
   // Sync external search keyword from Navbar in real-time
   React.useEffect(() => {
     setFilters((prev) => (prev.keyword !== keyword ? { ...prev, keyword } : prev));
   }, [keyword]);
+
+  // Debounced live database query when searching
+  React.useEffect(() => {
+    const q = filters.keyword.trim();
+    if (q.length >= 2) {
+      setIsSearchingDb(true);
+      const timer = setTimeout(async () => {
+        try {
+          const results = await searchJobsInDatabase(q, 30);
+          setDbSearchResults(results);
+        } catch (err) {
+          console.warn('Real-time database search error:', err);
+        } finally {
+          setIsSearchingDb(false);
+        }
+      }, 200);
+      return () => clearTimeout(timer);
+    } else {
+      setDbSearchResults([]);
+      setIsSearchingDb(false);
+    }
+  }, [filters.keyword]);
 
   const handleFilterUpdate = (newFilters: JobFiltersState) => {
     setFilters(newFilters);
@@ -56,8 +88,19 @@ export const HomePage: React.FC<HomePageProps> = ({
     }
   };
 
-  const categories = Array.from(new Set(jobs.map((j) => j.category).filter(Boolean)));
-  const filteredJobs = filterJobs(jobs, filters);
+  // Combine real-time database results with cached/subscribed jobs
+  const mergedJobs = React.useMemo(() => {
+    if (!filters.keyword.trim() || dbSearchResults.length === 0) {
+      return jobs;
+    }
+    const map = new Map<string, Job>();
+    jobs.forEach((j) => map.set(j.id, j));
+    dbSearchResults.forEach((j) => map.set(j.id, j));
+    return Array.from(map.values());
+  }, [jobs, dbSearchResults, filters.keyword]);
+
+  const categories = Array.from(new Set(mergedJobs.map((j) => j.category).filter(Boolean)));
+  const filteredJobs = filterJobs(mergedJobs, filters);
   
   // Quick spotlight sections
   const remoteJobs = jobs.filter((j) => j.workArrangement === 'remote').slice(0, 3);
@@ -129,7 +172,7 @@ export const HomePage: React.FC<HomePageProps> = ({
       </section>
 
       {/* Main Content Area: Search & Listings */}
-      <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <section id="browse-jobs-section" className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         
         {/* Search & Filter Component */}
         <div className="mb-8">
@@ -159,7 +202,7 @@ export const HomePage: React.FC<HomePageProps> = ({
           </div>
         ) : filteredJobs.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-slate-300 p-12 text-center dark:border-slate-800 bg-white dark:bg-slate-900/40">
-            <Briefcase className="mx-auto h-12 w-12 text-slate-400 mb-3" />
+            <JobIcon className="mx-auto h-12 w-12 text-slate-400 mb-3" />
             <h3 className="text-base font-bold text-slate-800 dark:text-white">
               No matching job listings found
             </h3>
@@ -200,9 +243,6 @@ export const HomePage: React.FC<HomePageProps> = ({
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
               <div>
-                <span className="text-xs font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
-                  Work From Anywhere
-                </span>
                 <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
                   Trending Remote Opportunities
                 </h2>
@@ -224,6 +264,71 @@ export const HomePage: React.FC<HomePageProps> = ({
           </div>
         </section>
       )}
+
+      {/* Browse by Department Section */}
+      <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+          <div>
+            <span className="text-xs font-semibold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
+              Explore by Role
+            </span>
+            <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+              Browse by Department
+            </h2>
+          </div>
+          <button
+            onClick={() => onNavigate('/departments')}
+            className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-700 dark:text-indigo-400"
+          >
+            <span>View all departments</span>
+            <ArrowRight className="h-3.5 w-3.5" />
+          </button>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+          {[
+            { name: 'Engineering', slug: 'engineering', icon: Code2, color: 'text-blue-500', bg: 'bg-blue-50 dark:bg-blue-950/40' },
+            { name: 'Design & Creative', slug: 'design', icon: Palette, color: 'text-pink-500', bg: 'bg-pink-50 dark:bg-pink-950/40' },
+            { name: 'Marketing & Growth', slug: 'marketing', icon: TrendingUp, color: 'text-emerald-500', bg: 'bg-emerald-50 dark:bg-emerald-950/40' },
+            { name: 'Data & Analytics', slug: 'data', icon: Database, color: 'text-violet-500', bg: 'bg-violet-50 dark:bg-violet-950/40' },
+            { name: 'Sales & Business Dev', slug: 'sales', icon: DollarSign, color: 'text-amber-500', bg: 'bg-amber-50 dark:bg-amber-950/40' },
+            { name: 'Operations', slug: 'operations', icon: Settings, color: 'text-slate-500', bg: 'bg-slate-100 dark:bg-slate-800/60' },
+            { name: 'Customer Success', slug: 'customer-support', icon: Headphones, color: 'text-cyan-500', bg: 'bg-cyan-50 dark:bg-cyan-950/40' },
+          ].map((dept) => {
+            const Icon = dept.icon;
+            const deptJobCount = jobs.filter(j => 
+              (j.category || '').toLowerCase().includes(dept.slug) ||
+              (j.title || '').toLowerCase().includes(dept.name.toLowerCase().split(' ')[0])
+            ).length;
+            return (
+              <button
+                key={dept.slug}
+                onClick={() => onNavigate(`/category/${dept.slug}`)}
+                className="group flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 text-left hover:border-indigo-400 hover:shadow-md dark:border-slate-800 dark:bg-slate-900/90 dark:hover:border-indigo-600/70 transition-all duration-200"
+              >
+                <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${dept.bg} group-hover:scale-105 transition-transform`}>
+                  <Icon className={`h-5 w-5 ${dept.color}`} />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors leading-snug truncate">
+                    {dept.name}
+                  </p>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                    {deptJobCount} {deptJobCount === 1 ? 'role' : 'roles'}
+                  </p>
+                </div>
+              </button>
+            );
+          })}
+          <button
+            onClick={() => onNavigate('/departments')}
+            className="group flex items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-white p-4 text-xs font-semibold text-slate-600 hover:border-indigo-400 hover:text-indigo-600 dark:border-slate-700 dark:bg-slate-900/50 dark:text-slate-400 dark:hover:border-indigo-600 dark:hover:text-indigo-400 transition-all duration-200"
+          >
+            <span>More</span>
+            <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
+          </button>
+        </div>
+      </section>
 
       {/* Internships Section */}
       {internships.length > 0 && (
@@ -254,26 +359,27 @@ export const HomePage: React.FC<HomePageProps> = ({
         </section>
       )}
 
-      {/* Notification Callout */}
+      {/* Simple Employer Hero Banner */}
       <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="rounded-2xl border border-indigo-200/80 bg-gradient-to-br from-indigo-50 to-white p-6 sm:p-8 dark:border-indigo-900/60 dark:from-indigo-950/40 dark:to-slate-900 shadow-sm flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="space-y-2 text-center md:text-left">
-            <div className="inline-flex items-center gap-1.5 rounded-md bg-indigo-100 px-2.5 py-0.5 text-xs font-semibold text-indigo-800 dark:bg-indigo-900/60 dark:text-indigo-200">
-              <BellRing className="h-3.5 w-3.5" />
-              Real-Time Push Alerts
-            </div>
-            <h3 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">
-              Never miss a fresh job posting
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 sm:p-8 dark:border-slate-800 dark:bg-slate-900 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
+              For Employers & Hiring Teams
+            </span>
+            <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white">
+              Hiring talent? Post your open roles and reach qualified candidates.
             </h3>
-            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 max-w-xl">
-              Enable native browser alerts to be notified instantly when new engineering, design, or internship roles are added to inaquired.
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              All submissions are reviewed and added within 24 hours with direct application links.
             </p>
           </div>
+
           <button
-            onClick={() => requestJobNotifications()}
-            className="shrink-0 rounded-xl bg-indigo-600 px-6 py-3 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-all"
+            type="button"
+            onClick={() => onNavigate('/post-a-job')}
+            className="shrink-0 rounded-xl bg-indigo-600 px-6 py-3 text-xs sm:text-sm font-bold tracking-wider text-white shadow-xs hover:bg-indigo-700 active:scale-95 transition-all cursor-pointer"
           >
-            Activate Instant Alerts
+            POST A JOB
           </button>
         </div>
       </section>
