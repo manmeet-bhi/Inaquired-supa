@@ -80,7 +80,7 @@ app.get('/api/auth/health', (req, res) => {
     status: 'ok',
     service: 'inaquired-auth-recovery-2fa',
     resendConfigured: hasApiKey,
-    fromEmail: process.env.RESEND_FROM_EMAIL || 'inaquired <noreply@noreply.anywhereroles.in>'
+    fromEmail: process.env.RESEND_FROM_EMAIL || ''
   });
 });
 

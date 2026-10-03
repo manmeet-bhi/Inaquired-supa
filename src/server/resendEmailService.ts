@@ -48,12 +48,13 @@ function getResendClient(): Resend | null {
 export function normalizeFromEmail(rawFrom?: string): string {
   let from = (rawFrom || '').replace(/['"]/g, '').trim();
   if (!from) {
-    return 'inaquired <noreply@noreply.anywhereroles.in>';
+    // Fallback pulled from environment — never hardcoded
+    return process.env.RESEND_FROM_EMAIL?.replace(/['"]/g, '').trim() || 'noreply@noreply.anywhereroles.in';
   }
 
   // Handle case where user provided raw domain: "noreply.anywhereroles.in"
   if (from === 'noreply.anywhereroles.in') {
-    return 'inaquired <noreply@noreply.anywhereroles.in>';
+    return `inaquired <noreply@${from}>`;
   }
 
   // Handle format like "inaquired <noreply.anywhereroles.in>" missing '@'
