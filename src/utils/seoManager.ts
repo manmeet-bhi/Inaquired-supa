@@ -4,10 +4,40 @@ import { getGlobalSeoSettings, getPageSeoList, PageRouteSeo, GlobalSeoSettings }
 export function applyRouteSEO(pathname: string) {
   if (typeof document === 'undefined') return;
 
-  // Normalized path
-  const normalizedPath = pathname === '' ? '/' : pathname;
+  // If on a job detail page, let JobDetailPage manage its specific title and structured data
+  if (pathname.startsWith('/jobs/')) {
+    return;
+  }
+
+  // Normalized path with aliases
+  let normalizedPath = pathname === '' ? '/' : pathname;
+  if (normalizedPath === '/by-departments') normalizedPath = '/departments';
+  if (normalizedPath === '/by-companies') normalizedPath = '/companies';
+  if (normalizedPath === '/post-job') normalizedPath = '/post-a-job';
+  if (normalizedPath === '/cookie-policy') normalizedPath = '/cookies';
+
+  // Dynamic Category Pages: /category/[slug]
+  if (normalizedPath.startsWith('/category/')) {
+    const rawCategory = decodeURIComponent(normalizedPath.replace('/category/', '')).trim();
+    const formatted = rawCategory
+      .split(/[-_]+/)
+      .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(' ');
+    document.title = `${formatted} Jobs | inaquired`;
+    return;
+  }
+
+  // Dynamic Company Pages: /company/[name]
+  if (normalizedPath.startsWith('/company/')) {
+    const company = decodeURIComponent(normalizedPath.replace('/company/', '')).trim();
+    document.title = `Careers at ${company} | inaquired`;
+    return;
+  }
 
   Promise.all([getGlobalSeoSettings(), getPageSeoList()]).then(([globalSettings, pageList]) => {
+    // Check again in case route navigated away during fetch
+    if (window.location.pathname.startsWith('/jobs/')) return;
+
     // 1. Google Site Verification
     if (globalSettings.googleSiteVerification) {
       let meta = document.querySelector('meta[name="google-site-verification"]');

@@ -8,6 +8,7 @@ import {
   subscribeToPublishedJobs 
 } from './services/jobService';
 import { triggerJobNotification } from './services/notificationService';
+import { applyRouteSEO } from './utils/seoManager';
 
 const HomePage = lazy(() => import('./pages/HomePage').then(m => ({ default: m.HomePage })));
 const CategoryJobsPage = lazy(() => import('./pages/CategoryJobsPage').then(m => ({ default: m.CategoryJobsPage })));
@@ -45,6 +46,32 @@ function MainApp() {
   const [searchKeyword, setSearchKeyword] = useState<string>('');
   const previousJobsCountRef = useRef<number | null>(null);
 
+  // Static per-page title fallbacks applied immediately on every navigation
+  // (applyRouteSEO will later override with admin-configured titles from Supabase)
+  const PAGE_TITLES: Record<string, string> = {
+    '/': 'inaquired – Find Remote, On-Site & Hybrid Jobs & Internships',
+    '/jobs': 'Explore Verified Job Openings | inaquired',
+    '/remote-jobs': 'Remote Jobs – Work From Anywhere | inaquired',
+    '/onsite-jobs': 'On-Site Jobs & In-Office Roles | inaquired',
+    '/hybrid-jobs': 'Hybrid Jobs & Flexible Office Roles | inaquired',
+    '/internships': 'Paid Internships & Early Career Roles | inaquired',
+    '/departments': 'Browse Jobs by Department | inaquired',
+    '/by-departments': 'Browse Jobs by Department | inaquired',
+    '/companies': 'Browse Hiring Companies | inaquired',
+    '/by-companies': 'Browse Hiring Companies | inaquired',
+    '/about': 'About Us | inaquired',
+    '/contact': 'Contact & Support | inaquired',
+    '/post-a-job': 'Post a Job Listing | inaquired',
+    '/post-job': 'Post a Job Listing | inaquired',
+    '/privacy': 'Privacy Policy | inaquired',
+    '/terms': 'Terms of Service | inaquired',
+    '/cookies': 'Cookie Policy | inaquired',
+    '/cookie-policy': 'Cookie Policy | inaquired',
+    '/admin': 'Admin Control Panel | inaquired',
+    '/admin/forgot-password': 'Reset Password | inaquired',
+    '/admin/reset-password': 'Set New Password | inaquired',
+  };
+
   const navigate = (path: string) => {
     if (path !== currentPath) {
       window.history.pushState({}, '', path);
@@ -60,6 +87,27 @@ function MainApp() {
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
+
+  // Apply per-page title & meta on every route change
+  useEffect(() => {
+    const path = currentPath || '/';
+    // 1. Set static or dynamic title immediately (no async wait)
+    if (path.startsWith('/category/')) {
+      const slug = decodeURIComponent(path.replace('/category/', '')).trim();
+      const formatted = slug.split(/[-_]+/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+      document.title = `${formatted} Jobs | inaquired`;
+    } else if (path.startsWith('/company/')) {
+      const company = decodeURIComponent(path.replace('/company/', '')).trim();
+      document.title = `Careers at ${company} | inaquired`;
+    } else if (!path.startsWith('/jobs/')) {
+      const staticTitle = PAGE_TITLES[path] || 'inaquired – Find Remote, On-Site & Hybrid Jobs & Internships';
+      document.title = staticTitle;
+    }
+
+    // 2. Then override with admin-configured SEO from Supabase
+    applyRouteSEO(path);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPath]);
 
   // Real-time Supabase subscription for published jobs
   useEffect(() => {

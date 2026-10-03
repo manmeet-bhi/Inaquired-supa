@@ -4,10 +4,10 @@
  */
 
 export function cleanPathname(pathname: string): string {
-  if (!pathname || pathname === '/') return '/';
+  if (!pathname || pathname === '/' || pathname === '/index.html') return '/';
   // Remove duplicate slashes and trailing slashes (except root)
   const cleaned = pathname.replace(/\/+/g, '/').replace(/\/+$/, '');
-  return cleaned === '' ? '/' : cleaned;
+  return cleaned === '' || cleaned === '/index.html' ? '/' : cleaned;
 }
 
 export function buildCanonicalUrl(

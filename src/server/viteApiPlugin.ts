@@ -28,16 +28,22 @@ export function viteAccountRecoveryPlugin(): Plugin {
   return {
     name: 'vite-account-recovery-plugin',
     async transformIndexHtml(html, ctx) {
-      const url = ctx.originalUrl?.split('?')[0] || ctx.path || '/';
+      let url = ctx.originalUrl?.split('?')[0] || ctx.path || '/';
+      if (url === '/index.html' || !url || url === '') {
+        url = '/';
+      }
       if (url.startsWith('/admin') || url.startsWith('/api') || url.startsWith('/@')) {
         return html;
       }
       try {
         const anyCtx = ctx as any;
-        const host = anyCtx.req?.headers?.host || 'localhost:3000';
+        const host = anyCtx.req?.headers?.host || 'inaquired.app';
         const proto = anyCtx.req?.headers?.['x-forwarded-proto'] || (host.includes('localhost') ? 'http' : 'https');
-        const origin = `${proto}://${host}`;
-        const meta = await generateMetadata(url, origin);
+        const origin = host.includes('localhost') ? `${proto}://${host}` : 'https://inaquired.app';
+        let meta = await generateMetadata(url, origin);
+        if (meta.statusCode === 404 && (url === '/' || url === '/index.html')) {
+          meta = await generateMetadata('/', origin);
+        }
         return injectMetadataIntoHtml(html, meta);
       } catch (err) {
         console.warn('[Vite SEO Engine] Error injecting server metadata:', err);

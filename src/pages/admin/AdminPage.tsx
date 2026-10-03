@@ -46,8 +46,7 @@ import {
   subscribeToAllJobsForAdmin, 
   createJob, 
   updateJob, 
-  deleteJob, 
-  seedInitialJobsIfEmpty 
+  deleteJob 
 } from '../../services/jobService';
 import { 
   Category, 
@@ -97,7 +96,7 @@ interface AdminPageProps {
   onNavigate: (path: string) => void;
 }
 
-export type AdminTab = 'home' | 'jobs' | 'categories' | 'users' | 'seo' | 'system' | 'profile';
+export type AdminTab = 'home' | 'jobs' | 'categories' | 'users' | 'seo' | 'profile';
 
 export interface AdminRouteState {
   tab: AdminTab;
@@ -302,20 +301,7 @@ export function parseAdminPath(pathname: string): AdminRouteState {
     };
   }
 
-  // 12. Database / System: /admin/system or /admin/database
-  if (clean === '/admin/system' || clean === '/admin/database') {
-    return {
-      tab: 'system',
-      isJobEditorOpen: false,
-      editingJobId: null,
-      isCategoryEditorOpen: false,
-      editingCategoryId: null,
-      isUserEditorOpen: false,
-      editingUserId: null,
-    };
-  }
-
-  // 13. Profile: /admin/profile or /admin/account or /admin/security or /admin/2fa
+  // 12. Profile: /admin/profile or /admin/account or /admin/security or /admin/2fa
   if (
     clean === '/admin/profile' || 
     clean === '/admin/account' || 
@@ -338,7 +324,7 @@ export function parseAdminPath(pathname: string): AdminRouteState {
   if (typeof window !== 'undefined') {
     const params = new URLSearchParams(window.location.search);
     const tabParam = params.get('tab');
-    if (tabParam && ['home', 'jobs', 'categories', 'users', 'seo', 'system', 'profile'].includes(tabParam)) {
+    if (tabParam && ['home', 'jobs', 'categories', 'users', 'seo', 'profile'].includes(tabParam)) {
       return {
         tab: tabParam as AdminTab,
         isJobEditorOpen: false,
@@ -518,7 +504,6 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
     else if (tab === 'categories') target = '/admin/departments';
     else if (tab === 'users') target = '/admin/users';
     else if (tab === 'seo') target = '/admin/seo';
-    else if (tab === 'system') target = '/admin/system';
     else if (tab === 'profile') target = '/admin/profile';
     navigateToAdminPath(target);
   };
@@ -1116,21 +1101,12 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
     setTimeout(() => setCopiedSlug(null), 2000);
   };
 
-  // Handle Re-seed Sample Jobs
-  const handleSeedData = async () => {
-    if (confirm('Sync and ensure sample verified jobs are populated into Supabase?')) {
-      await seedInitialJobsIfEmpty();
-      showToast('Verified sample jobs synced to Supabase.');
-    }
-  };
-
   const adminHeaderContent: Record<AdminTab, { title: string; description: string }> = {
     home: { title: 'Home', description: 'Platform activity, recent listings, and operational health.' },
     jobs: { title: 'Listings', description: 'Create, review, and organize job listings.' },
     categories: { title: 'Departments', description: 'Manage job categories and candidate browse pages.' },
     users: { title: 'Users & Access', description: 'Manage administrator accounts, roles, and access.' },
     seo: { title: 'SEO Suite', description: 'Manage search appearance and indexing settings.' },
-    system: { title: 'Database Sync', description: 'Review database connectivity and maintenance actions.' },
     profile: { title: 'Account Settings', description: 'Manage your profile and account security.' },
   };
 
@@ -1405,27 +1381,6 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
               {!isSidebarCollapsed && (
                 <div className="flex flex-1 items-center justify-between text-left truncate">
                   <span>SEO Suite</span>
-                </div>
-              )}
-            </button>
-
-            {/* Database & System Status Navigation Tab */}
-            <button
-              onClick={() => {
-                changeTab('system');
-                setIsMobileMenuOpen(false);
-              }}
-              className={`w-full mt-1.5 flex items-center gap-3 rounded-xl px-3 py-2.5 text-xs font-semibold transition-all cursor-pointer ${
-                activeTab === 'system'
-                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/25 dark:bg-indigo-600'
-                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/60 dark:hover:text-white'
-              } ${isSidebarCollapsed ? 'justify-center' : ''}`}
-              title="Supabase Database & System Settings"
-            >
-              <Database className="h-4 w-4 shrink-0" />
-              {!isSidebarCollapsed && (
-                <div className="flex flex-1 items-center justify-between text-left truncate">
-                  <span>Database Sync</span>
                 </div>
               )}
             </button>
@@ -2255,97 +2210,6 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
           {/* TAB 4: SEO SUITE & SEARCH ENGINE INDEXING */}
           {activeTab === 'seo' && (
             <SeoPanel onShowToast={showToast} />
-          )}
-
-          {/* TAB 5: SYSTEM & DATABASE SETTINGS */}
-          {activeTab === 'system' && (
-            <div className="space-y-6 animate-in fade-in duration-200 max-w-4xl">
-              
-              {/* Connection Diagnostics Card */}
-              <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs dark:border-slate-800 dark:bg-slate-900 space-y-4">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400">
-                      <Database className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <h2 className="text-base font-bold text-slate-900 dark:text-white">
-                        Supabase PostgreSQL Live Connection
-                      </h2>
-                      <p className="text-xs text-slate-500 dark:text-slate-400">
-                        Primary relational database hosted at db.wnpsrdtlqxfiglhmalwq.supabase.co
-                      </p>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={checkConnection}
-                    disabled={checkingConnection}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800 transition-colors"
-                  >
-                    <RefreshCw className={`h-3.5 w-3.5 ${checkingConnection ? 'animate-spin' : ''}`} />
-                    <span>Test Latency</span>
-                  </button>
-                </div>
-
-                <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-950/50 grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div>
-                    <span className="text-[11px] font-semibold text-slate-400 uppercase">Status</span>
-                    <div className="mt-1 flex items-center gap-2">
-                      <span className={`h-2.5 w-2.5 rounded-full ${supabaseConnected ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
-                      <span className="text-xs font-bold text-slate-900 dark:text-white">
-                        {supabaseConnected ? 'Online & Synchronized' : 'Offline Mode Active'}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div>
-                    <span className="text-[11px] font-semibold text-slate-400 uppercase">Schema Version</span>
-                    <p className="mt-1 text-xs font-mono font-bold text-slate-900 dark:text-white">
-                      002_categories_schema
-                    </p>
-                  </div>
-
-                  <div>
-                    <span className="text-[11px] font-semibold text-slate-400 uppercase">Realtime WebSockets</span>
-                    <p className="mt-1 text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                      Active (public:jobs, public:categories)
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Maintenance & Data Actions */}
-              <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs dark:border-slate-800 dark:bg-slate-900 space-y-4">
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                  Database Operations & Recovery
-                </h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Safely populate initial seed data or re-verify sample listings in case of fresh deployment.
-                </p>
-
-                <div className="flex flex-wrap items-center gap-3 pt-2">
-                  <button
-                    onClick={handleSeedData}
-                    className="inline-flex items-center gap-2 rounded-xl bg-indigo-50 border border-indigo-200 px-4 py-2.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 dark:bg-indigo-950/40 dark:border-indigo-900/60 dark:text-indigo-300 dark:hover:bg-indigo-950/70 transition-colors"
-                  >
-                    <RefreshCw className="h-3.5 w-3.5" />
-                    <span>Sync Sample Jobs into Supabase</span>
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      checkConnection();
-                      showToast('Database channels reconnected.');
-                    }}
-                    className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800 transition-colors"
-                  >
-                    <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
-                    <span>Re-verify Connection Channels</span>
-                  </button>
-                </div>
-              </div>
-            </div>
           )}
 
           {activeTab === 'profile' && adminUser && (

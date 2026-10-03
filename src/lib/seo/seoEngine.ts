@@ -48,7 +48,8 @@ export async function generateMetadata(
   pathname: string,
   origin: string
 ): Promise<ServerMetadata> {
-  const cleanPath = cleanPathname(pathname.split('?')[0]);
+  const rawPath = cleanPathname(pathname.split('?')[0]);
+  const cleanPath = (rawPath === '/index.html' || rawPath === '') ? '/' : rawPath;
   const baseOrigin = origin.replace(/\/+$/, '');
 
   // 1. Fetch Global Settings from Supabase
@@ -213,13 +214,105 @@ export async function generateMetadata(
     }
   }
 
+  // 3.5 Dynamic Category Page: /category/[slug]
+  if (cleanPath.startsWith('/category/') && cleanPath !== '/category') {
+    const rawCategory = decodeURIComponent(cleanPath.replace('/category/', '')).trim();
+    const formattedCategory = rawCategory
+      .split(/[-_]+/)
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+    const title = `${formattedCategory} Jobs ${sep} ${siteName}`;
+    const description = `Discover verified ${formattedCategory} career opportunities on ${siteName}. Apply directly with salary transparency.`;
+    const canonicalUrl = buildCanonicalUrl(undefined, cleanPath, baseOrigin);
+
+    return {
+      title,
+      description,
+      canonicalUrl,
+      robots: { index: true, follow: true },
+      openGraph: {
+        title,
+        description,
+        url: canonicalUrl,
+        siteName,
+        type: 'website',
+        imageUrl: globalSeo.defaultOgImageUrl || undefined
+      },
+      twitter: {
+        card: 'summary_large_image',
+        title,
+        description,
+        site: globalSeo.twitterHandle,
+        imageUrl: globalSeo.defaultOgImageUrl || undefined
+      },
+      verification: {
+        google: globalSeo.googleSiteVerification,
+        bing: globalSeo.bingSiteVerification
+      },
+      breadcrumbs: [
+        { name: 'Home', path: '/' },
+        { name: 'Departments', path: '/departments' },
+        { name: formattedCategory, path: cleanPath }
+      ],
+      jsonLd: [],
+      statusCode: 200
+    };
+  }
+
+  // 3.6 Dynamic Company Page: /company/[name]
+  if (cleanPath.startsWith('/company/') && cleanPath !== '/company') {
+    const company = decodeURIComponent(cleanPath.replace('/company/', '')).trim();
+    const title = `Careers at ${company} ${sep} ${siteName}`;
+    const description = `Explore open job openings and career opportunities at ${company} on ${siteName}.`;
+    const canonicalUrl = buildCanonicalUrl(undefined, cleanPath, baseOrigin);
+
+    return {
+      title,
+      description,
+      canonicalUrl,
+      robots: { index: true, follow: true },
+      openGraph: {
+        title,
+        description,
+        url: canonicalUrl,
+        siteName,
+        type: 'website',
+        imageUrl: globalSeo.defaultOgImageUrl || undefined
+      },
+      twitter: {
+        card: 'summary_large_image',
+        title,
+        description,
+        site: globalSeo.twitterHandle,
+        imageUrl: globalSeo.defaultOgImageUrl || undefined
+      },
+      verification: {
+        google: globalSeo.googleSiteVerification,
+        bing: globalSeo.bingSiteVerification
+      },
+      breadcrumbs: [
+        { name: 'Home', path: '/' },
+        { name: 'Companies', path: '/companies' },
+        { name: company, path: cleanPath }
+      ],
+      jsonLd: [],
+      statusCode: 200
+    };
+  }
+
   // 4. Static Public Routes & Overrides
+  let targetPath = cleanPath;
+  if (targetPath === '/by-departments') targetPath = '/departments';
+  if (targetPath === '/by-companies') targetPath = '/companies';
+  if (targetPath === '/post-job') targetPath = '/post-a-job';
+  if (targetPath === '/cookie-policy') targetPath = '/cookies';
+
   let pageConfig: any = null;
   try {
     const { data } = await supabase
       .from('seo_page_settings')
       .select('*')
-      .eq('route_path', cleanPath)
+      .eq('route_path', targetPath)
       .single();
 
     if (data) {
@@ -244,7 +337,7 @@ export async function generateMetadata(
 
   // Fallback to DEFAULT_PAGE_SEO_LIST if database entry not yet populated
   if (!pageConfig) {
-    pageConfig = DEFAULT_PAGE_SEO_LIST.find(p => p.routePath === cleanPath) || null;
+    pageConfig = DEFAULT_PAGE_SEO_LIST.find(p => p.routePath === targetPath) || null;
   }
 
   // If known page exists
