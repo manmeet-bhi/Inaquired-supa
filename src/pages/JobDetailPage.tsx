@@ -73,6 +73,7 @@ export const JobDetailPage: React.FC<JobDetailPageProps> = ({ slug, jobs, onNavi
   
   // Find job from loaded list or by slug/id
   const job = jobs.find((j) => j.slug === slug || j.id === slug);
+  const isArchived = job?.status === 'archived';
 
   // Filter 7-8 related jobs from the same department/category
   const sameDeptJobs = job ? jobs.filter(
@@ -89,7 +90,7 @@ export const JobDetailPage: React.FC<JobDetailPageProps> = ({ slug, jobs, onNavi
     if (job) {
       document.title = `${job.title} at ${job.companyName} | inaquired`;
       
-      // Inject JobPosting JSON-LD for rich Google Search indexing
+      // Only active roles should be exposed to search engines as JobPosting results.
       const scriptId = 'jobposting-schema-jsonld';
       let existingScript = document.getElementById(scriptId);
       if (existingScript) existingScript.remove();
@@ -132,7 +133,9 @@ export const JobDetailPage: React.FC<JobDetailPageProps> = ({ slug, jobs, onNavi
           },
         } : undefined,
       });
-      document.head.appendChild(script);
+      if (job.status === 'published') {
+        document.head.appendChild(script);
+      }
 
       return () => {
         const s = document.getElementById(scriptId);
@@ -215,10 +218,11 @@ export const JobDetailPage: React.FC<JobDetailPageProps> = ({ slug, jobs, onNavi
               <span className="text-base font-bold text-slate-700 dark:text-slate-300">
                 {job.companyName}
               </span>
-              <span className="inline-flex items-center gap-1 rounded bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                <ShieldCheck className="h-3 w-3 text-emerald-500" />
-                Verified Opportunity
-              </span>
+              {isArchived && (
+                <span className="inline-flex items-center rounded-full border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300">
+                  Closed
+                </span>
+              )}
               {job.featured && (
                 <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 border border-amber-200/80 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800/50">
                   <Sparkles className="h-3 w-3" />
@@ -254,15 +258,24 @@ export const JobDetailPage: React.FC<JobDetailPageProps> = ({ slug, jobs, onNavi
             </div>
           </div>
 
+          {isArchived && (
+            <div className="flex w-full items-start gap-3 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-200 sm:w-56">
+              <span className="font-semibold">Not currently active</span>
+              <span className="sr-only">Applications for this role are closed.</span>
+            </div>
+          )}
+
           {/* Action CTAs: Apply Now & Share */}
           <div className="flex sm:flex-col items-center sm:items-stretch gap-3 shrink-0">
-            <button
-              onClick={handleApply}
-              className="w-full sm:w-48 inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-6 py-3.5 text-sm font-bold text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-all"
-            >
-              <span>Apply Now</span>
-              <ExternalLink className="h-4 w-4" />
-            </button>
+            {!isArchived && (
+              <button
+                onClick={handleApply}
+                className="w-full sm:w-48 inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-6 py-3.5 text-sm font-bold text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-all"
+              >
+                <span>Apply Now</span>
+                <ExternalLink className="h-4 w-4" />
+              </button>
+            )}
 
             <button
               onClick={handleShare}
@@ -408,7 +421,7 @@ export const JobDetailPage: React.FC<JobDetailPageProps> = ({ slug, jobs, onNavi
           <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-5 dark:border-slate-800 dark:bg-slate-900/40 text-xs text-slate-500 dark:text-slate-400 space-y-2">
             <span className="font-semibold text-slate-700 dark:text-slate-300 block">Candidate Safety Notice</span>
             <p>
-              inaquired verifies openings directly with employers. Legitimate employers will never ask for payment or sensitive financial information during the interview process.
+              Inaquired brings you job openings from a range of verified sources. Our service is always free for candidates—we never ask you to pay any amount to browse or apply for a job.
             </p>
           </div>
         </div>

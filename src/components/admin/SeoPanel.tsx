@@ -51,9 +51,41 @@ type SeoSubTab = 'pages' | 'jobs' | 'redirects' | 'simulator' | 'global' | 'robo
 type PageCategoryFilter = 'all' | 'core' | 'jobs' | 'legal';
 type PageEditorSection = 'snippet' | 'social' | 'indexing' | 'audit';
 
+const SEO_PANEL_STATE_KEY = 'admin_seo_panel_state';
+
+interface SeoPanelUiState {
+  activeSubTab: SeoSubTab;
+  activeEditorSection: PageEditorSection;
+  selectedRoute: string;
+  pageViewMode: 'editor' | 'directory';
+}
+
+function readSeoPanelUiState(): Partial<SeoPanelUiState> {
+  try {
+    const value = sessionStorage.getItem(SEO_PANEL_STATE_KEY);
+    if (!value) return {};
+    const parsed = JSON.parse(value) as Partial<SeoPanelUiState>;
+    return {
+      activeSubTab: ['pages', 'jobs', 'redirects', 'simulator', 'global', 'robots'].includes(parsed.activeSubTab || '')
+        ? parsed.activeSubTab
+        : undefined,
+      activeEditorSection: ['snippet', 'social', 'indexing', 'audit'].includes(parsed.activeEditorSection || '')
+        ? parsed.activeEditorSection
+        : undefined,
+      selectedRoute: typeof parsed.selectedRoute === 'string' ? parsed.selectedRoute : undefined,
+      pageViewMode: parsed.pageViewMode === 'directory' || parsed.pageViewMode === 'editor'
+        ? parsed.pageViewMode
+        : undefined,
+    };
+  } catch (error) {
+    console.warn('Could not restore SEO editor state:', error);
+    return {};
+  }
+}
+
 export const SeoPanel: React.FC<SeoPanelProps> = ({ onShowToast }) => {
-  const [activeSubTab, setActiveSubTab] = useState<SeoSubTab>('pages');
-  const [activeEditorSection, setActiveEditorSection] = useState<PageEditorSection>('snippet');
+  const [activeSubTab, setActiveSubTab] = useState<SeoSubTab>(() => readSeoPanelUiState().activeSubTab || 'pages');
+  const [activeEditorSection, setActiveEditorSection] = useState<PageEditorSection>(() => readSeoPanelUiState().activeEditorSection || 'snippet');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [copiedUrl, setCopiedUrl] = useState(false);
@@ -63,8 +95,8 @@ export const SeoPanel: React.FC<SeoPanelProps> = ({ onShowToast }) => {
 
   // Pages State
   const [pages, setPages] = useState<PageRouteSeo[]>([]);
-  const [selectedRoute, setSelectedRoute] = useState<string>('/');
-  const [pageViewMode, setPageViewMode] = useState<'editor' | 'directory'>('editor');
+  const [selectedRoute, setSelectedRoute] = useState<string>(() => readSeoPanelUiState().selectedRoute || '/');
+  const [pageViewMode, setPageViewMode] = useState<'editor' | 'directory'>(() => readSeoPanelUiState().pageViewMode || 'editor');
   const [pageSearchFilter, setPageSearchFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<PageCategoryFilter>('all');
   const [keywordInput, setKeywordInput] = useState<string>('');
@@ -95,12 +127,15 @@ export const SeoPanel: React.FC<SeoPanelProps> = ({ onShowToast }) => {
         const [g, p] = await Promise.all([getGlobalSeoSettings(), getPageSeoList()]);
         setGlobalSettings(g);
         setPages(p);
-        const homePage = p.find(item => item.routePath === '/') || p[0];
-        if (homePage) {
-          setSelectedRoute(homePage.routePath);
-          setSimTitle(homePage.metaTitle);
-          setSimDesc(homePage.metaDescription);
-          setSimUrl(homePage.canonicalUrl || homePage.routePath);
+        const restoredState = readSeoPanelUiState();
+        const initialPage = p.find(item => item.routePath === restoredState.selectedRoute)
+          || p.find(item => item.routePath === '/')
+          || p[0];
+        if (initialPage) {
+          setSelectedRoute(initialPage.routePath);
+          setSimTitle(initialPage.metaTitle);
+          setSimDesc(initialPage.metaDescription);
+          setSimUrl(initialPage.canonicalUrl || initialPage.routePath);
         }
 
         // Fetch live server SEO summary
@@ -121,6 +156,19 @@ export const SeoPanel: React.FC<SeoPanelProps> = ({ onShowToast }) => {
     }
     loadData();
   }, []);
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(SEO_PANEL_STATE_KEY, JSON.stringify({
+        activeSubTab,
+        activeEditorSection,
+        selectedRoute,
+        pageViewMode,
+      } satisfies SeoPanelUiState));
+    } catch (error) {
+      console.warn('Could not save SEO editor state:', error);
+    }
+  }, [activeSubTab, activeEditorSection, selectedRoute, pageViewMode]);
 
   // Adjust robots textarea height automatically
   useEffect(() => {
@@ -425,21 +473,21 @@ export const SeoPanel: React.FC<SeoPanelProps> = ({ onShowToast }) => {
                       setPageViewMode('editor');
                     }
                   }}
-                  className="rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-white py-1.5 pl-3 pr-8 text-xs font-bold text-slate-900 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 cursor-pointer max-w-[220px] sm:max-w-xs md:max-w-sm truncate"
+                  className="rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-white py-1.5 pl-3 pr-8 text-xs font-bold text-slate-900 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:[color-scheme:dark] cursor-pointer max-w-[220px] sm:max-w-xs md:max-w-sm truncate"
                 >
-                  <optgroup label="Core Pages">
+                  <optgroup label="Core Pages" className="bg-white text-slate-700 dark:bg-slate-900 dark:text-slate-200">
                     {pages.filter(p => ['/', '/about', '/contact', '/departments', '/companies'].includes(p.routePath)).map(p => (
-                      <option key={p.routePath} value={p.routePath}>{p.pageName} ({p.routePath})</option>
+                      <option key={p.routePath} value={p.routePath} className="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100">{p.pageName} ({p.routePath})</option>
                     ))}
                   </optgroup>
-                  <optgroup label="Job Directories">
+                  <optgroup label="Job Directories" className="bg-white text-slate-700 dark:bg-slate-900 dark:text-slate-200">
                     {pages.filter(p => ['/jobs', '/remote-jobs', '/hybrid-jobs', '/internships'].includes(p.routePath)).map(p => (
-                      <option key={p.routePath} value={p.routePath}>{p.pageName} ({p.routePath})</option>
+                      <option key={p.routePath} value={p.routePath} className="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100">{p.pageName} ({p.routePath})</option>
                     ))}
                   </optgroup>
-                  <optgroup label="Legal & Policies">
+                  <optgroup label="Legal & Policies" className="bg-white text-slate-700 dark:bg-slate-900 dark:text-slate-200">
                     {pages.filter(p => ['/privacy-policy', '/terms', '/cookie-policy', '/post-a-job'].includes(p.routePath)).map(p => (
-                      <option key={p.routePath} value={p.routePath}>{p.pageName} ({p.routePath})</option>
+                      <option key={p.routePath} value={p.routePath} className="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100">{p.pageName} ({p.routePath})</option>
                     ))}
                   </optgroup>
                 </select>

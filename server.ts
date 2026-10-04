@@ -25,6 +25,7 @@ import {
   handleSitemapXml,
   handleSeoSummary
 } from './src/server/seoHandlers.ts';
+import { handlePublicJobs } from './src/server/publicJobsHandler.ts';
 import { getRedirectForPath } from './src/services/redirectService.ts';
 import { generateMetadata, injectMetadataIntoHtml } from './src/lib/seo/seoEngine.ts';
 
@@ -96,6 +97,7 @@ app.get('/api/auth/health', (req, res) => {
 app.get('/robots.txt', (req, res) => handleRobotsTxt(req, res));
 app.get('/sitemap.xml', (req, res) => handleSitemapXml(req, res));
 app.get('/api/seo/summary', (req, res) => handleSeoSummary(req, res));
+app.get('/api/public/jobs', (req, res) => handlePublicJobs(req, res));
 
 // 301 / 308 Permanent SEO Redirect Middleware
 app.use(async (req, res, next) => {

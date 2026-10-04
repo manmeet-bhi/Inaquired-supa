@@ -27,6 +27,7 @@ import {
   handleSitemapXml,
   handleSeoSummary
 } from './seoHandlers.ts';
+import { handlePublicJobs } from './publicJobsHandler.ts';
 import { getRedirectForPath } from '../services/redirectService.ts';
 import { generateMetadata, injectMetadataIntoHtml } from '../lib/seo/seoEngine.ts';
 
@@ -86,6 +87,10 @@ export function viteAccountRecoveryPlugin(): Plugin {
 
         if (url === '/api/seo/summary' && req.method === 'GET') {
           return handleSeoSummary(req, res);
+        }
+
+        if (url === '/api/public/jobs' && req.method === 'GET') {
+          return handlePublicJobs(req, res);
         }
 
         if (req.method === 'OPTIONS') {

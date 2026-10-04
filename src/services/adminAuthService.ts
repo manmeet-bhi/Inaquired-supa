@@ -142,15 +142,21 @@ export async function signOutAdmin(): Promise<void> {
  * Subscribes to Supabase authentication state changes
  */
 export function onAdminAuthStateChange(callback: (user: AdminSessionUser | null) => void): () => void {
-  const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+  const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
     if (!session?.user) {
-      callback(null);
+      if (event === 'SIGNED_OUT') callback(null);
       return;
     }
 
+    // Refreshing an access token does not change the administrator identity.
+    // Avoid an unnecessary profile query that could log out the UI on a transient error.
+    if (event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') return;
+
     void getActiveAdmin(session.user.id)
       .then(callback)
-      .catch(() => callback(null));
+      .catch((error) => {
+        console.warn('Could not refresh administrator profile after auth change:', error);
+      });
   });
 
   return () => {

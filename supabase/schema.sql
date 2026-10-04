@@ -69,7 +69,7 @@ ALTER TABLE public.jobs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.subscribers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.audit_logs ENABLE ROW LEVEL SECURITY;
 
--- Allow public read access to published jobs
+-- Allow public read access to published jobs only
 CREATE POLICY "Public users can view published jobs"
   ON public.jobs
   FOR SELECT

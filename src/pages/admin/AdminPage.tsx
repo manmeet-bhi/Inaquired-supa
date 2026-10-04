@@ -850,7 +850,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
     );
 
     return () => unsubscribe();
-  }, [adminUser]);
+  }, [adminUser?.id]);
 
   // Real-time subscription to Categories
   useEffect(() => {
@@ -863,7 +863,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
     });
 
     return () => unsubscribe();
-  }, [adminUser]);
+  }, [adminUser?.id]);
 
   // Real-time subscription to Users
   useEffect(() => {
@@ -876,7 +876,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
     });
 
     return () => unsubscribe();
-  }, [adminUser]);
+  }, [adminUser?.id]);
 
   // Filtered Users list
   const filteredUsers = useMemo(() => {
@@ -1015,11 +1015,19 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
 
   // Handle Quick Status Switch
   const handleToggleJobStatus = async (job: Job, newStatus: JobStatus) => {
+    const publishedAt = newStatus === 'published' ? new Date().toISOString() : job.publishedAt;
     try {
-      await updateJob(job.id, { 
+      await updateJob(job.id, {
         status: newStatus,
-        publishedAt: newStatus === 'published' ? new Date().toISOString() : job.publishedAt
+        publishedAt,
       });
+      setJobs((currentJobs) =>
+        currentJobs.map((currentJob) =>
+          currentJob.id === job.id
+            ? { ...currentJob, status: newStatus, publishedAt }
+            : currentJob
+        )
+      );
       showToast(`Status updated to ${newStatus}.`);
     } catch (err: any) {
       alert(`Failed to update status: ${err.message}`);
@@ -1967,7 +1975,6 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
                         <tr>
                           <th className="py-3 pl-5 pr-3">Department Name</th>
                           <th className="px-3 py-3">URL Slug</th>
-                          <th className="px-3 py-3">Description</th>
                           <th className="px-3 py-3 text-center">Active Roles</th>
                           <th className="py-3 pl-3 pr-5 text-right">Actions</th>
                         </tr>
@@ -2012,11 +2019,6 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
                                     )}
                                   </button>
                                 </div>
-                              </td>
-
-                              {/* Description */}
-                              <td className="px-3 py-3.5 max-w-xs truncate text-slate-500 dark:text-slate-400">
-                                {cat.description || <span className="italic text-slate-400">No description provided</span>}
                               </td>
 
                               {/* Associated Job Count */}

@@ -4,9 +4,7 @@ import { Navbar } from './components/layout/Navbar';
 import { Footer } from './components/layout/Footer';
 import { CookieBanner } from './components/layout/CookieBanner';
 import { Job } from './types/job';
-import { 
-  subscribeToPublishedJobs 
-} from './services/jobService';
+import { subscribeToPublicJobs } from './services/jobService';
 import { triggerJobNotification } from './services/notificationService';
 import { applyRouteSEO } from './utils/seoManager';
 
@@ -21,6 +19,7 @@ const TermsPage = lazy(() => import('./pages/TermsPage').then(m => ({ default: m
 const CookiePolicyPage = lazy(() => import('./pages/CookiePolicyPage').then(m => ({ default: m.CookiePolicyPage })));
 const DepartmentsPage = lazy(() => import('./pages/DepartmentsPage').then(m => ({ default: m.DepartmentsPage })));
 const CompaniesPage = lazy(() => import('./pages/CompaniesPage').then(m => ({ default: m.CompaniesPage })));
+const NotFoundPage = lazy(() => import('./pages/NotFoundPage').then(m => ({ default: m.NotFoundPage })));
 const AdminPage = lazy(() => import('./pages/admin/AdminPage').then(m => ({ default: m.AdminPage })));
 const AdminForgotPasswordPage = lazy(() => import('./pages/admin/AdminForgotPasswordPage').then(m => ({ default: m.AdminForgotPasswordPage })));
 const AdminResetPasswordPage = lazy(() => import('./pages/admin/AdminResetPasswordPage').then(m => ({ default: m.AdminResetPasswordPage })));
@@ -44,7 +43,7 @@ function MainApp() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loadingJobs, setLoadingJobs] = useState<boolean>(true);
   const [searchKeyword, setSearchKeyword] = useState<string>('');
-  const previousJobsCountRef = useRef<number | null>(null);
+  const previousJobIdsRef = useRef<Set<string> | null>(null);
 
   // Static per-page title fallbacks applied immediately on every navigation
   // (applyRouteSEO will later override with admin-configured titles from Supabase)
@@ -118,7 +117,7 @@ function MainApp() {
       const company = decodeURIComponent(path.replace('/company/', '')).trim();
       document.title = `Careers at ${company} | inaquired`;
     } else if (!path.startsWith('/jobs/')) {
-      const staticTitle = PAGE_TITLES[path] || 'inaquired – Find Remote, On-Site & Hybrid Jobs & Internships';
+      const staticTitle = PAGE_TITLES[path] || 'Page Not Found | inaquired';
       document.title = staticTitle;
     }
 
@@ -129,25 +128,25 @@ function MainApp() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPath]);
 
-  // Real-time Supabase subscription for published jobs
+  // Real-time Supabase subscription for published and archived public jobs
   useEffect(() => {
     setLoadingJobs(true);
 
-    const unsubscribe = subscribeToPublishedJobs(
-      (publishedJobs) => {
-        if (previousJobsCountRef.current !== null && publishedJobs.length > previousJobsCountRef.current) {
-          const newestJob = publishedJobs[0];
-          if (newestJob) {
-            triggerJobNotification(newestJob);
-          }
+    const unsubscribe = subscribeToPublicJobs(
+      (publicJobs) => {
+        const previousJobIds = previousJobIdsRef.current;
+        const newPublishedJob = previousJobIds
+          ? publicJobs.find((job) => job.status === 'published' && !previousJobIds.has(job.id))
+          : undefined;
+        if (newPublishedJob) {
+          triggerJobNotification(newPublishedJob);
         }
-        previousJobsCountRef.current = publishedJobs.length;
-        setJobs(publishedJobs);
+        previousJobIdsRef.current = new Set(publicJobs.map((job) => job.id));
+        setJobs(publicJobs);
         setLoadingJobs(false);
       },
       (err) => {
-        console.error('Published jobs fetch error:', err);
-        setJobs([]);
+        console.error('Public jobs fetch error:', err);
         setLoadingJobs(false);
       }
     );
@@ -177,6 +176,20 @@ function MainApp() {
         <CategoryJobsPage
           pageType="category"
           categorySlug={slug}
+          jobs={jobs}
+          loading={loadingJobs}
+          onNavigate={navigate}
+          onSelectJob={handleSelectJob}
+          keyword={searchKeyword}
+          onKeywordChange={setSearchKeyword}
+        />
+      );
+    }
+
+    if (currentPath === '/jobs') {
+      return (
+        <CategoryJobsPage
+          pageType="all"
           jobs={jobs}
           loading={loadingJobs}
           onNavigate={navigate}
@@ -303,16 +316,20 @@ function MainApp() {
       return <CookiePolicyPage onNavigate={navigate} />;
     }
 
-    return (
-      <HomePage
-        jobs={jobs}
-        loading={loadingJobs}
-        onNavigate={navigate}
-        onSelectJob={handleSelectJob}
-        keyword={searchKeyword}
-        onKeywordChange={setSearchKeyword}
-      />
-    );
+    if (currentPath === '/') {
+      return (
+        <HomePage
+          jobs={jobs}
+          loading={loadingJobs}
+          onNavigate={navigate}
+          onSelectJob={handleSelectJob}
+          keyword={searchKeyword}
+          onKeywordChange={setSearchKeyword}
+        />
+      );
+    }
+
+    return <NotFoundPage onNavigate={navigate} />;
   };
 
   if (currentPath === '/admin/forgot-password' || currentPath.startsWith('/admin/forgot-password') || currentPath === '/admin/recovery') {

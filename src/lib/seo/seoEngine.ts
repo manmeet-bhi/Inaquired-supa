@@ -171,9 +171,9 @@ export async function generateMetadata(
         { name: job.title, path: `/jobs/${job.slug || job.id}` }
       ];
 
-      // Structured Data: JobPosting + BreadcrumbList
+      // Archived roles should not appear in search as active JobPosting results.
       const jsonLd: Record<string, any>[] = [
-        generateJobPostingJsonLd(job, baseOrigin),
+        ...(isPublished ? [generateJobPostingJsonLd(job, baseOrigin)] : []),
         generateBreadcrumbJsonLd(breadcrumbs, baseOrigin)
       ];
 

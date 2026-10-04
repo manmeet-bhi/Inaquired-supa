@@ -16,6 +16,7 @@ import {
   handleDisable2Fa
 } from '../../src/server/twoFactorApiHandlers.ts';
 import { handleSeoSummary } from '../../src/server/seoHandlers.ts';
+import { handlePublicJobs } from '../../src/server/publicJobsHandler.ts';
 
 export const handler = async (event: any, context: any) => {
   // Normalize request path
@@ -23,6 +24,8 @@ export const handler = async (event: any, context: any) => {
   if (rawPath.startsWith('/.netlify/functions/api')) {
     rawPath = rawPath.replace('/.netlify/functions/api', '/api');
   }
+  const queryString = new URLSearchParams(event.queryStringParameters || {}).toString();
+  const requestUrl = queryString ? `${rawPath}?${queryString}` : rawPath;
 
   // Handle CORS preflight
   if (event.httpMethod === 'OPTIONS') {
@@ -71,8 +74,8 @@ export const handler = async (event: any, context: any) => {
 
   const req = {
     method: event.httpMethod,
-    url: rawPath,
-    originalUrl: rawPath,
+    url: requestUrl,
+    originalUrl: requestUrl,
     path: rawPath,
     headers: event.headers || {},
     body: parsedBody,
@@ -115,6 +118,8 @@ export const handler = async (event: any, context: any) => {
       await handleResetPassword(req, res);
     } else if (rawPath === '/api/seo/summary' && event.httpMethod === 'GET') {
       await handleSeoSummary(req, res);
+    } else if (rawPath === '/api/public/jobs' && event.httpMethod === 'GET') {
+      await handlePublicJobs(req, res);
     } else if (rawPath === '/api/auth/health' && event.httpMethod === 'GET') {
       const hasApiKey = Boolean(process.env.RESEND_API_KEY && process.env.RESEND_API_KEY.startsWith('re_'));
       sendJsonResponse(res, 200, {

@@ -1,5 +1,5 @@
 import React from 'react';
-import { MapPin, Clock, DollarSign, ArrowUpRight, Sparkles } from 'lucide-react';
+import { MapPin, Clock, DollarSign, ArrowUpRight, Sparkles, CircleSlash } from 'lucide-react';
 import { JobIcon } from '../icons/JobIcon';
 import { Job } from '../../types/job';
 import { formatSalary, formatRelativeDate } from '../../utils/jobUtils';
@@ -46,7 +46,7 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onClick }) => {
           onClick(job.slug || job.id);
         }
       }}
-      aria-label={`View job opening for ${job.title} at ${job.companyName}`}
+      aria-label={`${job.status === 'archived' ? 'View closed job opening' : 'View job opening'} for ${job.title} at ${job.companyName}`}
     >
       <div>
         {/* Top Header: Company, Arrangement badge, Featured indicator (NO company logos!) */}
@@ -59,6 +59,12 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onClick }) => {
               <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700 border border-amber-200/70 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800/50">
                 <Sparkles className="h-3 w-3" />
                 Featured
+              </span>
+            )}
+            {job.status === 'archived' && (
+              <span className="inline-flex items-center gap-1 rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[11px] font-semibold text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300">
+                <CircleSlash aria-hidden="true" className="h-3 w-3" />
+                Closed
               </span>
             )}
           </div>
@@ -116,8 +122,8 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onClick }) => {
           </span>
         </div>
 
-        <div className="flex items-center gap-1 font-semibold text-indigo-600 dark:text-indigo-400 group-hover:translate-x-0.5 transition-transform">
-          <span>Details</span>
+        <div className={`flex items-center gap-1 font-semibold transition-transform ${job.status === 'archived' ? 'text-slate-500 dark:text-slate-400' : 'text-indigo-600 dark:text-indigo-400 group-hover:translate-x-0.5'}`}>
+          <span>{job.status === 'archived' ? 'View closed role' : 'Details'}</span>
           <ArrowUpRight className="h-3.5 w-3.5" />
         </div>
       </div>

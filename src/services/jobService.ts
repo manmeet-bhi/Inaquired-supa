@@ -73,55 +73,49 @@ function mapToDb(job: Partial<Job>): Record<string, any> {
   return row;
 }
 
+async function fetchPublicJobs(params = ''): Promise<Job[]> {
+  const response = await fetch(`/api/public/jobs${params}`);
+  const result = await response.json();
+  if (!response.ok) {
+    throw new Error(result.error || `Public jobs request failed with status ${response.status}.`);
+  }
+  if (!Array.isArray(result.jobs)) {
+    throw new Error('Public jobs endpoint returned an invalid response.');
+  }
+  return result.jobs.map(mapFromDb);
+}
+
 /**
- * Subscribes to published jobs in real-time directly from Supabase PostgreSQL.
+ * Polls the server-side public jobs endpoint so archived jobs stay protected by RLS.
  */
-export function subscribeToPublishedJobs(
+export function subscribeToPublicJobs(
   onUpdate: (jobs: Job[]) => void,
   onError?: (error: Error) => void
 ): Unsubscribe {
   let isSubscribed = true;
+  let isFetching = false;
 
-  const fetchPublishedJobs = async () => {
+  const refreshPublicJobs = async () => {
+    if (isFetching) return;
+    isFetching = true;
     try {
-      const { data, error } = await supabase
-        .from('jobs')
-        .select('*')
-        .eq('status', 'published')
-        .order('published_at', { ascending: false });
-
-      if (error) {
-        console.error('Supabase fetch published jobs error:', error.message);
-        if (onError) onError(new Error(error.message));
-        return;
-      }
-
-      if (isSubscribed && data) {
-        onUpdate(data.map(mapFromDb));
-      }
-    } catch (err: any) {
-      console.error('Network error in Supabase fetch published jobs:', err);
-      if (onError) onError(err);
+      const jobs = await fetchPublicJobs();
+      if (isSubscribed) onUpdate(jobs);
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err));
+      console.error('Public jobs endpoint request failed:', error);
+      if (isSubscribed && onError) onError(error);
+    } finally {
+      isFetching = false;
     }
   };
 
-  fetchPublishedJobs();
-
-  // Supabase real-time channel
-  const channel = supabase
-    .channel('public:published_jobs')
-    .on(
-      'postgres_changes',
-      { event: '*', schema: 'public', table: 'jobs' },
-      () => {
-        fetchPublishedJobs();
-      }
-    )
-    .subscribe();
+  void refreshPublicJobs();
+  const intervalId = window.setInterval(() => void refreshPublicJobs(), 30_000);
 
   return () => {
     isSubscribed = false;
-    supabase.removeChannel(channel);
+    window.clearInterval(intervalId);
   };
 }
 
@@ -183,56 +177,22 @@ export async function getJobBySlug(slug: string): Promise<Job | null> {
   if (!cleanSlug) return null;
 
   try {
-    const { data, error } = await supabase
-      .from('jobs')
-      .select('*')
-      .or(`slug.eq.${cleanSlug},id.eq.${cleanSlug}`)
-      .limit(1)
-      .maybeSingle();
-
-    if (error) {
-      console.error('Supabase getJobBySlug error:', error.message);
-      return null;
-    }
-
-    if (data) {
-      return mapFromDb(data);
-    }
-
-    return null;
+    const jobs = await fetchPublicJobs(`?slug=${encodeURIComponent(cleanSlug)}`);
+    return jobs[0] || null;
   } catch (error) {
-    console.error('Supabase getJobBySlug network error:', error);
-    return null;
+    console.error('Public job lookup failed:', error);
+    throw error;
   }
 }
 
 /**
- * Searches published jobs directly in the Supabase PostgreSQL database in real-time.
+ * Searches public jobs through the server endpoint.
  */
 export async function searchJobsInDatabase(query: string, limit: number = 20): Promise<Job[]> {
-  // Strip control and special characters that could alter PostgREST filter structure
-  const cleanQuery = query.replace(/[,()"\\]/g, ' ').replace(/\s+/g, ' ').trim();
+  const cleanQuery = query.trim();
   if (!cleanQuery) return [];
-
-  try {
-    const { data, error } = await supabase
-      .from('jobs')
-      .select('*')
-      .eq('status', 'published')
-      .or(`title.ilike.%${cleanQuery}%,company_name.ilike.%${cleanQuery}%,category.ilike.%${cleanQuery}%,location.ilike.%${cleanQuery}%`)
-      .order('published_at', { ascending: false })
-      .limit(limit);
-
-    if (error) {
-      console.warn('Supabase database search error:', error.message);
-      return [];
-    }
-
-    return (data || []).map(mapFromDb);
-  } catch (err) {
-    console.warn('Database search exception:', err);
-    return [];
-  }
+  const params = new URLSearchParams({ q: cleanQuery, limit: String(limit) });
+  return fetchPublicJobs(`?${params.toString()}`);
 }
 
 /**
