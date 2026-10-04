@@ -260,8 +260,7 @@ export const JobDetailPage: React.FC<JobDetailPageProps> = ({ slug, jobs, onNavi
 
           {isArchived && (
             <div className="flex w-full items-start gap-3 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-200 sm:w-56">
-              <span className="font-semibold">Not currently active</span>
-              <span className="sr-only">Applications for this role are closed.</span>
+              <span className="font-semibold">No longer accepting applications.</span>
             </div>
           )}
 

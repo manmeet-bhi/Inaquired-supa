@@ -70,9 +70,10 @@ import {
 import { testSupabaseConnection } from '../../lib/supabase';
 import { 
   getAdminSession, 
-  signOutAdmin, 
-  onAdminAuthStateChange, 
-  AdminSessionUser 
+  isAdminTwoFactorVerified,
+  signOutAdmin,
+  onAdminAuthStateChange,
+  AdminSessionUser
 } from '../../services/adminAuthService';
 import { JobEditorPage } from '../../components/admin/JobEditorPage';
 import { CategoryEditorPage } from '../../components/admin/CategoryEditorPage';
@@ -748,8 +749,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
             try {
               const twoFa = await get2FaStatus(user.email);
               if (twoFa && twoFa.twoFactorEnabled) {
-                const isVerified = typeof window !== 'undefined' && 
-                  sessionStorage.getItem('2fa_verified_email') === user.email.toLowerCase();
+                const isVerified = isAdminTwoFactorVerified(user.email);
                 if (!isVerified) {
                   // User has not passed 2FA in this session. Require 2FA challenge.
                   setAdminUser(null);
@@ -777,8 +777,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
           try {
             const twoFa = await get2FaStatus(user.email);
             if (twoFa && twoFa.twoFactorEnabled) {
-              const isVerified = typeof window !== 'undefined' && 
-                sessionStorage.getItem('2fa_verified_email') === user.email.toLowerCase();
+              const isVerified = isAdminTwoFactorVerified(user.email);
               if (!isVerified) {
                 setAdminUser(null);
                 return;
@@ -803,6 +802,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
     try {
       if (typeof window !== 'undefined') {
         sessionStorage.removeItem('2fa_verified_email');
+        localStorage.removeItem('2fa_verified_email');
         sessionStorage.removeItem('2fa_pending_email');
         sessionStorage.removeItem(ADMIN_LAST_PATH_KEY);
       }

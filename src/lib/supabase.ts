@@ -25,6 +25,58 @@ export const SUPABASE_STORAGE_REGION =
 export const SUPABASE_STORAGE_BUCKET =
   getEnvVar('VITE_SUPABASE_STORAGE_BUCKET', 'ap-northeast-1');
 
+const sessionPersistenceKey = 'inaquired_admin_keep_logged_in';
+const observedAuthStorageKeys = new Set<string>();
+let keepAdminSessionLoggedIn = true;
+
+if (typeof window !== 'undefined') {
+  try {
+    keepAdminSessionLoggedIn = window.localStorage.getItem(sessionPersistenceKey) !== 'false';
+  } catch (error) {
+    console.warn('Could not read administrator session preference:', error);
+  }
+}
+
+const authStorage = {
+  getItem: async (key: string) => {
+    observedAuthStorageKeys.add(key);
+    if (typeof window === 'undefined') return null;
+    const storage = keepAdminSessionLoggedIn ? window.localStorage : window.sessionStorage;
+    return storage.getItem(key);
+  },
+  setItem: async (key: string, value: string) => {
+    observedAuthStorageKeys.add(key);
+    if (typeof window === 'undefined') return;
+    const storage = keepAdminSessionLoggedIn ? window.localStorage : window.sessionStorage;
+    storage.setItem(key, value);
+  },
+  removeItem: async (key: string) => {
+    observedAuthStorageKeys.add(key);
+    if (typeof window === 'undefined') return;
+    window.localStorage.removeItem(key);
+    window.sessionStorage.removeItem(key);
+  },
+};
+
+export function setAdminSessionPersistence(keepLoggedIn: boolean): void {
+  keepAdminSessionLoggedIn = keepLoggedIn;
+  if (typeof window === 'undefined') return;
+
+  try {
+    window.localStorage.setItem(sessionPersistenceKey, String(keepLoggedIn));
+    for (const key of observedAuthStorageKeys) {
+      const target = keepLoggedIn ? window.localStorage : window.sessionStorage;
+      const source = keepLoggedIn ? window.sessionStorage : window.localStorage;
+      const existingSession = source.getItem(key);
+      if (existingSession) target.setItem(key, existingSession);
+      source.removeItem(key);
+    }
+  } catch (error) {
+    console.error('Could not update administrator session persistence:', error);
+    throw error;
+  }
+}
+
 /**
  * Supabase client instance for real-time data sync, database queries, and storage
  */
@@ -32,6 +84,7 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
+    storage: authStorage,
   },
 });
 

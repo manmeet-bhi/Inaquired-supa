@@ -69,9 +69,16 @@ export function subscribeToUsers(
       }
     )
     .subscribe();
+  const handleVisibilityChange = () => {
+    if (document.visibilityState === 'visible') {
+      void load();
+    }
+  };
+  document.addEventListener('visibilitychange', handleVisibilityChange);
 
   return () => {
     isSubscribed = false;
+    document.removeEventListener('visibilitychange', handleVisibilityChange);
     supabase.removeChannel(channel);
   };
 }

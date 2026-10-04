@@ -14,7 +14,11 @@ import {
   FileText,
   Clock,
 } from 'lucide-react';
-import { signInAdmin, AdminSessionUser } from '../../services/adminAuthService';
+import {
+  setAdminTwoFactorVerified,
+  signInAdmin,
+  AdminSessionUser,
+} from '../../services/adminAuthService';
 import { 
   get2FaStatus, 
   sendEmail2FaCode, 
@@ -39,6 +43,7 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
   // Credentials form state
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [keepLoggedIn, setKeepLoggedIn] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -98,7 +103,7 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
 
     try {
       setLoading(true);
-      const user = await signInAdmin(cleanEmail, password);
+      const user = await signInAdmin(cleanEmail, password, keepLoggedIn);
 
       // Check if user has 2FA enabled
       const status = await get2FaStatus(cleanEmail);
@@ -126,7 +131,7 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
       }
 
       // No 2FA required: complete login immediately
-      sessionStorage.setItem('2fa_verified_email', cleanEmail);
+      setAdminTwoFactorVerified(cleanEmail, keepLoggedIn);
       sessionStorage.removeItem('2fa_pending_email');
       onLoginSuccess(user);
     } catch (err: any) {
@@ -181,7 +186,7 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
 
       if (res.success) {
         // Successful 2FA verification! Complete login and record verified session
-        sessionStorage.setItem('2fa_verified_email', pendingUser.email.toLowerCase());
+        setAdminTwoFactorVerified(pendingUser.email, keepLoggedIn);
         sessionStorage.removeItem('2fa_pending_email');
         onLoginSuccess(pendingUser);
       } else {
@@ -309,7 +314,16 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
                       {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
                   </div>
-                    <div className="mt-2 flex justify-end">
+                    <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                      <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+                        <input
+                          type="checkbox"
+                          checked={keepLoggedIn}
+                          onChange={(event) => setKeepLoggedIn(event.target.checked)}
+                          className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 dark:border-slate-700"
+                        />
+                        Keep me logged in
+                      </label>
                       <button
                         type="button"
                         onClick={() => onNavigate('/admin/forgot-password')}

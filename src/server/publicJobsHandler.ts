@@ -52,12 +52,15 @@ function getSearchParams(req: any): URLSearchParams {
 export async function handlePublicJobs(req: any, res: any) {
   const supabaseUrl = process.env.VITE_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!supabaseUrl || !serviceRoleKey) {
-    console.error('[Public Jobs API] VITE_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be configured.');
+  const anonKey = process.env.VITE_SUPABASE_ANON_KEY;
+  const supabaseKey = serviceRoleKey || anonKey;
+  if (!supabaseUrl || !supabaseKey) {
+    console.error('[Public Jobs API] VITE_SUPABASE_URL and a Supabase API key must be configured.');
     return sendJson(res, 503, { error: 'Job listings are temporarily unavailable.' });
   }
 
   try {
+    const visibleStatuses = ['published', 'archived'];
     const searchParams = getSearchParams(req);
     const rawSlug = searchParams.get('slug');
     const slug = rawSlug?.trim();
@@ -67,7 +70,7 @@ export async function handlePublicJobs(req: any, res: any) {
     const limit = Number.isFinite(requestedLimit)
       ? Math.min(Math.max(requestedLimit, 1), 100)
       : 30;
-    const supabase = createClient(supabaseUrl, serviceRoleKey, {
+    const supabase = createClient(supabaseUrl, supabaseKey, {
       auth: { persistSession: false, autoRefreshToken: false },
     });
 
@@ -82,7 +85,7 @@ export async function handlePublicJobs(req: any, res: any) {
       let query = supabase
         .from('jobs')
         .select(publicJobColumns)
-        .in('status', ['published', 'archived']);
+        .in('status', visibleStatuses);
 
       if (slug) {
         query = query.or(`slug.eq.${slug},id.eq.${slug}`).limit(1);
@@ -110,7 +113,7 @@ export async function handlePublicJobs(req: any, res: any) {
       const { data, error } = await supabase
         .from('jobs')
         .select(publicJobColumns)
-        .in('status', ['published', 'archived'])
+        .in('status', visibleStatuses)
         .order('published_at', { ascending: false })
         .range(offset, offset + pageSize - 1);
 

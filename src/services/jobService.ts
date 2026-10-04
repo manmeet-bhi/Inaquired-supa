@@ -112,10 +112,26 @@ export function subscribeToPublicJobs(
 
   void refreshPublicJobs();
   const intervalId = window.setInterval(() => void refreshPublicJobs(), 30_000);
+  const handleVisibilityChange = () => {
+    if (document.visibilityState === 'visible') {
+      void refreshPublicJobs();
+    }
+  };
+  const channel = supabase
+    .channel('public:published_jobs_sync')
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'jobs' },
+      () => void refreshPublicJobs()
+    )
+    .subscribe();
+  document.addEventListener('visibilitychange', handleVisibilityChange);
 
   return () => {
     isSubscribed = false;
     window.clearInterval(intervalId);
+    document.removeEventListener('visibilitychange', handleVisibilityChange);
+    void supabase.removeChannel(channel);
   };
 }
 
@@ -162,9 +178,16 @@ export function subscribeToAllJobsForAdmin(
       }
     )
     .subscribe();
+  const handleVisibilityChange = () => {
+    if (document.visibilityState === 'visible') {
+      void fetchAllJobs();
+    }
+  };
+  document.addEventListener('visibilitychange', handleVisibilityChange);
 
   return () => {
     isSubscribed = false;
+    document.removeEventListener('visibilitychange', handleVisibilityChange);
     supabase.removeChannel(channel);
   };
 }

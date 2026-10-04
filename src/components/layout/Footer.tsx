@@ -162,12 +162,6 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
         {/* Bottom Bar */}
         <div className="mt-8 pt-6 border-t border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-400 dark:text-slate-500">
           <p>© {new Date().getFullYear()} Inaquired. All rights reserved.</p>
-          <button
-            onClick={() => onNavigate('/admin')}
-            className="text-[11px] font-semibold text-slate-400 hover:text-indigo-600 dark:text-slate-500 dark:hover:text-indigo-400 transition-colors"
-          >
-            Admin Portal →
-          </button>
         </div>
       </div>
     </footer>

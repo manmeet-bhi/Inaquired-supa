@@ -1,4 +1,27 @@
-import { supabase } from '../lib/supabase';
+import { setAdminSessionPersistence, supabase } from '../lib/supabase';
+
+const verifiedAdminEmailKey = '2fa_verified_email';
+
+export function setAdminTwoFactorVerified(email: string, keepLoggedIn: boolean): void {
+  if (typeof window === 'undefined') return;
+  const storage = keepLoggedIn ? window.localStorage : window.sessionStorage;
+  const otherStorage = keepLoggedIn ? window.sessionStorage : window.localStorage;
+  storage.setItem(verifiedAdminEmailKey, email.trim().toLowerCase());
+  otherStorage.removeItem(verifiedAdminEmailKey);
+}
+
+export function isAdminTwoFactorVerified(email: string): boolean {
+  if (typeof window === 'undefined') return false;
+  const normalizedEmail = email.trim().toLowerCase();
+  return window.sessionStorage.getItem(verifiedAdminEmailKey) === normalizedEmail ||
+    window.localStorage.getItem(verifiedAdminEmailKey) === normalizedEmail;
+}
+
+export function clearAdminTwoFactorVerification(): void {
+  if (typeof window === 'undefined') return;
+  window.sessionStorage.removeItem(verifiedAdminEmailKey);
+  window.localStorage.removeItem(verifiedAdminEmailKey);
+}
 
 export interface AdminSessionUser {
   id: string;
@@ -49,9 +72,14 @@ export async function getAdminSession(): Promise<AdminSessionUser | null> {
 /**
  * Signs in an administrator using Supabase Auth with email & password
  */
-export async function signInAdmin(email: string, password: string): Promise<AdminSessionUser> {
+export async function signInAdmin(
+  email: string,
+  password: string,
+  keepLoggedIn: boolean
+): Promise<AdminSessionUser> {
   const cleanEmail = email.trim().toLowerCase();
 
+  setAdminSessionPersistence(keepLoggedIn);
   const { data, error } = await supabase.auth.signInWithPassword({
     email: cleanEmail,
     password,
@@ -135,6 +163,8 @@ export async function signOutAdmin(): Promise<void> {
     await supabase.auth.signOut();
   } catch (err) {
     console.warn('Supabase signOut notice:', err);
+  } finally {
+    clearAdminTwoFactorVerification();
   }
 }
 
