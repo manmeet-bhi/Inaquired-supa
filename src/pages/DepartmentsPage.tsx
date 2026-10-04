@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { JobIcon } from '../components/icons/JobIcon';
 import { Job } from '../types/job';
+import { sortJobsByNewest } from '../utils/jobUtils';
 
 interface DepartmentsPageProps {
   jobs: Job[];
@@ -97,6 +98,7 @@ export const DepartmentsPage: React.FC<DepartmentsPageProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 12;
+  const newestFirstJobs = sortJobsByNewest(jobs);
 
   // Extract all distinct categories from actual jobs
   const jobCategories = Array.from(new Set(jobs.map((j) => (j.category || '').trim()).filter(Boolean)));
@@ -119,7 +121,7 @@ export const DepartmentsPage: React.FC<DepartmentsPageProps> = ({
 
   // Calculate job counts and active jobs per department
   const departmentStats = allDepartments.map((dept) => {
-    const matchedJobs = jobs.filter((j) => {
+    const matchedJobs = newestFirstJobs.filter((j) => {
       const cat = (j.category || '').toLowerCase();
       const title = (j.title || '').toLowerCase();
       return (
@@ -134,7 +136,8 @@ export const DepartmentsPage: React.FC<DepartmentsPageProps> = ({
     return {
       ...dept,
       count: matchedJobs.length,
-      sampleJobs: matchedJobs.slice(0, 2),
+      matchingJobs: matchedJobs,
+      recentJob: matchedJobs[0],
     };
   });
 
@@ -145,7 +148,7 @@ export const DepartmentsPage: React.FC<DepartmentsPageProps> = ({
     return (
       dept.name.toLowerCase().includes(q) ||
       dept.description.toLowerCase().includes(q) ||
-      dept.sampleJobs.some((j) => j.title.toLowerCase().includes(q))
+      dept.matchingJobs.some((j) => j.title.toLowerCase().includes(q))
     );
   });
 
@@ -166,10 +169,6 @@ export const DepartmentsPage: React.FC<DepartmentsPageProps> = ({
       <section className="relative overflow-hidden pt-8 pb-12 sm:pt-12 sm:pb-16 bg-radial-[at_50%_0%] from-indigo-50/70 via-slate-50 to-white dark:from-indigo-950/30 dark:via-slate-950 dark:to-slate-950 border-b border-slate-200/80 dark:border-slate-800">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 text-center">
           
-          <div className="inline-flex items-center gap-1.5 rounded-full border border-indigo-200 bg-indigo-50/80 px-3 py-1 text-xs font-semibold text-indigo-700 shadow-2xs dark:border-indigo-800/80 dark:bg-indigo-950/60 dark:text-indigo-300 mb-4">
-            <Layers className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
-            <span>Role Discovery by Department</span>
-          </div>
 
           <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-slate-900 dark:text-white max-w-3xl mx-auto">
             Explore Openings by{' '}
@@ -214,27 +213,27 @@ export const DepartmentsPage: React.FC<DepartmentsPageProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {paginatedDepartments.map((dept) => {
             const Icon = dept.icon;
+            const recentJob = dept.recentJob;
             return (
-              <div
+              <article
                 key={dept.slug}
-                className="group flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-6 shadow-xs hover:border-indigo-400 hover:shadow-md dark:border-slate-800 dark:bg-slate-900/90 dark:hover:border-indigo-600/70 transition-all duration-200"
+                role="link"
+                tabIndex={0}
+                aria-label={`Explore ${dept.name} jobs`}
+                onClick={() => onNavigate(`/category/${dept.slug}`)}
+                onKeyDown={(event) => {
+                  if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) {
+                    event.preventDefault();
+                    onNavigate(`/category/${dept.slug}`);
+                  }
+                }}
+                className="group relative flex cursor-pointer flex-col justify-between overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-indigo-400 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 dark:border-slate-800 dark:bg-slate-900/90 dark:hover:border-indigo-600/70 dark:focus-visible:ring-offset-slate-950"
               >
-                <div>
-                  <div className="flex items-start justify-between gap-4 mb-4">
-                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400 group-hover:scale-105 transition-transform">
-                      <Icon className="h-5 w-5" />
-                    </div>
-                    <span
-                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${
-                        dept.count > 0
-                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800/40'
-                          : 'bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-800/60 dark:text-slate-400 dark:border-slate-700/50'
-                      }`}
-                    >
-                      {dept.count} {dept.count === 1 ? 'role' : 'roles'}
-                    </span>
-                  </div>
-
+                <Icon
+                  aria-hidden="true"
+                  className="pointer-events-none absolute -right-3 -top-4 h-32 w-32 text-indigo-500/[0.07] transition-transform duration-300 group-hover:scale-110 dark:text-indigo-300/[0.08]"
+                />
+                <div className="relative z-10">
                   <h3 className="text-base font-bold text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
                     {dept.name}
                   </h3>
@@ -242,35 +241,31 @@ export const DepartmentsPage: React.FC<DepartmentsPageProps> = ({
                     {dept.description}
                   </p>
 
-                  {/* Sample Role Pills */}
-                  {dept.sampleJobs.length > 0 && (
+                  {recentJob && (
                     <div className="mt-4 space-y-1.5 border-t border-slate-100 dark:border-slate-800/80 pt-3">
                       <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                        Recent Openings
+                        Recent Opening
                       </span>
-                      {dept.sampleJobs.map((j) => (
-                        <button
-                          key={j.id}
-                          onClick={() => onSelectJob(j.slug || j.id)}
-                          className="block w-full text-left truncate text-xs font-medium text-slate-700 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
-                        >
-                          • {j.title} <span className="text-[11px] text-slate-400 font-normal">at {j.companyName}</span>
-                        </button>
-                      ))}
+                      <button
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onSelectJob(recentJob.slug || recentJob.id);
+                        }}
+                        className="block w-full text-left truncate text-xs font-medium text-slate-700 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+                      >
+                        {recentJob.title}{' '}
+                        <span className="text-[11px] text-slate-400 font-normal">at {recentJob.companyName}</span>
+                      </button>
                     </div>
                   )}
                 </div>
 
-                <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800">
-                  <button
-                    onClick={() => onNavigate(`/category/${dept.slug}`)}
-                    className="inline-flex items-center justify-between w-full text-xs font-bold text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 transition-colors cursor-pointer"
-                  >
-                    <span>View all {dept.name} jobs</span>
-                    <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
-                  </button>
+                <div className="relative z-10 mt-6 flex justify-end border-t border-slate-100 pt-4 dark:border-slate-800">
+                  <span className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-indigo-600 transition-all group-hover:translate-x-0.5 group-hover:border-indigo-200 group-hover:bg-indigo-50 dark:border-slate-700 dark:bg-slate-800 dark:text-indigo-400 dark:group-hover:border-indigo-600/50 dark:group-hover:bg-indigo-950/40">
+                    <ArrowRight className="h-4 w-4" />
+                  </span>
                 </div>
-              </div>
+              </article>
             );
           })}
         </div>

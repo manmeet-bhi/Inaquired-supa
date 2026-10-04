@@ -24,9 +24,9 @@ if (!supabaseKey) {
 const supabase = createClient(supabaseUrl, supabaseKey);
 const directDbUri = process.env.SUPABASE_DIRECT_URL || process.env.DATABASE_URL || '';
 
-const TEST_EMAIL = process.env.TEST_ADMIN_EMAIL || '';
+const TEST_EMAIL = process.env.TEST_ADMIN_EMAIL || process.env.ADMIN_EMAIL || '';
 if (!TEST_EMAIL) {
-  throw new Error('Set TEST_ADMIN_EMAIL before running this test.');
+  throw new Error('Set TEST_ADMIN_EMAIL or ADMIN_EMAIL before running this test.');
 }
 
 async function runTwoFactorTests() {

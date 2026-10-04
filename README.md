@@ -113,7 +113,7 @@ npm run admin:create
 ### Admin Console Access
 - **URL**: [http://localhost:3000/admin](http://localhost:3000/admin) (or click **Admin Portal** in the website footer)
 - Provision administrator credentials explicitly with the `ADMIN_EMAIL` and `ADMIN_PASSWORD` environment variables before running `npm run admin:create`. Never commit production credentials.
-- Configure `APP_URL` as the public HTTPS origin in production, and provide `SUPABASE_SERVICE_ROLE_KEY` to the server for protected recovery and 2FA RPCs. `SUPABASE_DIRECT_URL` remains the database fallback; never expose server keys through `VITE_` variables.
+- Configure `APP_URL` as the public HTTPS origin in production (Netlify's `URL` or `DEPLOY_PRIME_URL` is used when `APP_URL` is unset), and provide `SUPABASE_SERVICE_ROLE_KEY` to the server for protected recovery and 2FA RPCs. `SUPABASE_DIRECT_URL` remains the database fallback; never expose server keys through `VITE_` variables.
 
 ---
 

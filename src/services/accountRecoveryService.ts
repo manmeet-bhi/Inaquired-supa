@@ -1,9 +1,6 @@
 export interface ForgotPasswordResponse {
   success: boolean;
   message: string;
-  mode?: 'resend_live' | 'dev_fallback';
-  devOtp?: string;
-  previewUrl?: string;
   error?: string;
 }
 
@@ -37,23 +34,31 @@ export async function requestPasswordReset(email: string): Promise<ForgotPasswor
     throw new Error('Please enter a valid email address.');
   }
 
+  let res: Response;
   try {
-    const res = await fetch('/api/auth/forgot-password', {
+    res = await fetch('/api/auth/forgot-password', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: cleanEmail }),
     });
-
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.error || 'Failed to send recovery email.');
-    }
-
-    return data;
   } catch (apiErr: any) {
     console.warn('[API Request Notice] Password recovery endpoint failed:', apiErr.message);
     throw new Error('Password recovery is temporarily unavailable. Please try again later.');
   }
+
+  let data: ForgotPasswordResponse;
+  try {
+    data = await res.json();
+  } catch (responseErr: any) {
+    console.warn('[API Response Notice] Password recovery endpoint returned invalid JSON:', responseErr.message);
+    throw new Error('Password recovery is temporarily unavailable. Please try again later.');
+  }
+
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to send recovery email.');
+  }
+
+  return data;
 }
 
 /**

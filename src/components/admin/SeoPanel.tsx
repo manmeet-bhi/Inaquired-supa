@@ -392,7 +392,6 @@ export const SeoPanel: React.FC<SeoPanelProps> = ({ onShowToast }) => {
                 </>
               ) : (
                 <>
-                  <Check className="h-3.5 w-3.5" />
                   <span>Save Changes</span>
                 </>
               )}

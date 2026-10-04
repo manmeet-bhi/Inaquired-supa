@@ -166,7 +166,6 @@ export const SeoRedirectsTab: React.FC<SeoRedirectsTabProps> = ({ onShowToast })
             onClick={() => setShowAddForm(!showAddForm)}
             className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-xs font-semibold text-white shadow-xs transition-all cursor-pointer"
           >
-            <Plus className="h-4 w-4" />
             <span>{showAddForm ? 'Close Form' : 'New 301 Redirect'}</span>
           </button>
         </div>
@@ -308,7 +307,6 @@ export const SeoRedirectsTab: React.FC<SeoRedirectsTabProps> = ({ onShowToast })
                 onClick={() => setShowAddForm(true)}
                 className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 text-xs font-semibold text-white hover:bg-indigo-500"
               >
-                <Plus className="h-3.5 w-3.5" />
                 <span>Add First Redirect</span>
               </button>
             )}

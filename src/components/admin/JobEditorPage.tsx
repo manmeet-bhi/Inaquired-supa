@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
+  Briefcase,
   ArrowLeft, 
   Building, 
   MapPin, 
@@ -211,13 +212,25 @@ export const JobEditorPage: React.FC<JobEditorPageProps> = ({
     setFeatured(false);
   };
 
+  const addTags = (tagsToAdd: string[]) => {
+    setTags((currentTags) => {
+      const knownTags = new Set(currentTags.map((tag) => tag.toLocaleLowerCase()));
+      const newTags = tagsToAdd
+        .map((tag) => tag.trim())
+        .filter((tag) => {
+          const normalizedTag = tag.toLocaleLowerCase();
+          if (!normalizedTag || knownTags.has(normalizedTag)) return false;
+          knownTags.add(normalizedTag);
+          return true;
+        });
+      return [...currentTags, ...newTags];
+    });
+  };
+
   const handleAddTag = (tagToAdd?: string) => {
-    const raw = tagToAdd || currentTagInput;
-    const trimmed = raw.trim();
-    if (trimmed && !tags.includes(trimmed)) {
-      setTags([...tags, trimmed]);
-      if (!tagToAdd) setCurrentTagInput('');
-    }
+    const raw = tagToAdd ?? currentTagInput;
+    addTags(raw.split(','));
+    if (tagToAdd === undefined) setCurrentTagInput('');
   };
 
   const handleRemoveTag = (tagToRemove: string) => {
@@ -308,6 +321,15 @@ export const JobEditorPage: React.FC<JobEditorPageProps> = ({
     }
   };
 
+  const tagSearchQuery = currentTagInput.split(',').pop()?.trim() || '';
+  const hasMinimumTagSearchLength = tagSearchQuery.replace(/[^a-z]/gi, '').length >= 3;
+  const matchingTagSuggestions = hasMinimumTagSearchLength
+    ? QUICK_TAG_SUGGESTIONS.filter((suggestion) =>
+        suggestion.toLocaleLowerCase().includes(tagSearchQuery.toLocaleLowerCase()) &&
+        !tags.some((tag) => tag.toLocaleLowerCase() === suggestion.toLocaleLowerCase())
+      )
+    : [];
+
   return (
     <div className="min-h-screen bg-slate-50/50 dark:bg-slate-950 pb-16">
       
@@ -354,10 +376,7 @@ export const JobEditorPage: React.FC<JobEditorPageProps> = ({
                   <span>Saving...</span>
                 </>
               ) : (
-                <>
-                  <Check className="h-4 w-4" />
-                  <span>{isEditing ? 'Save Changes' : 'Publish Job'}</span>
-                </>
+                <span>{isEditing ? 'Save Changes' : 'Publish Job'}</span>
               )}
             </button>
           </div>
@@ -397,7 +416,7 @@ export const JobEditorPage: React.FC<JobEditorPageProps> = ({
                     Job Title <span className="text-rose-500">*</span>
                   </label>
                   <div className="relative">
-                    <JobIcon className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
+                    <Briefcase aria-hidden="true" className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
                     <input
                       type="text"
                       required
@@ -718,27 +737,39 @@ export const JobEditorPage: React.FC<JobEditorPageProps> = ({
                 </select>
               </div>
 
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold text-slate-700 dark:text-slate-300">
                     Min Salary
                   </label>
-                  {isSalaryNotDisclosed && (
-                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
-                      Not disclosed
-                    </span>
-                  )}
+                  <input
+                    type="number"
+                    value={salaryMin}
+                    disabled={isSalaryNotDisclosed}
+                    onChange={(e) => {
+                      setSalaryMin(e.target.value);
+                      if (e.target.value) setIsSalaryNotDisclosed(false);
+                    }}
+                    placeholder="e.g. 80000"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-2 px-3 text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-indigo-500 focus:outline-none dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-100 dark:focus:bg-slate-900 disabled:opacity-50 disabled:bg-slate-100 dark:disabled:bg-slate-900/50 transition-all"
+                  />
                 </div>
-                <input
-                  type="number"
-                  value={salaryMin}
-                  disabled={isSalaryNotDisclosed}
-                  onChange={(e) => {
-                    setSalaryMin(e.target.value);
-                    if (e.target.value) setIsSalaryNotDisclosed(false);
-                  }}
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-2 px-3 text-xs sm:text-sm text-slate-900 focus:bg-white focus:border-indigo-500 focus:outline-none dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-100 dark:focus:bg-slate-900 disabled:opacity-50 disabled:bg-slate-100 dark:disabled:bg-slate-900/50 transition-all"
-                />
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                    Max Salary
+                  </label>
+                  <input
+                    type="number"
+                    value={salaryMax}
+                    disabled={isSalaryNotDisclosed}
+                    onChange={(e) => {
+                      setSalaryMax(e.target.value);
+                      if (e.target.value) setIsSalaryNotDisclosed(false);
+                    }}
+                    placeholder="e.g. 120000"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-2 px-3 text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-indigo-500 focus:outline-none dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-100 dark:focus:bg-slate-900 disabled:opacity-50 disabled:bg-slate-100 dark:disabled:bg-slate-900/50 transition-all"
+                  />
+                </div>
               </div>
 
               <div className="pt-1">
@@ -751,6 +782,7 @@ export const JobEditorPage: React.FC<JobEditorPageProps> = ({
                       setIsSalaryNotDisclosed(checked);
                       if (checked) {
                         setSalaryMin('');
+                        setSalaryMax('');
                       }
                     }}
                     className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 dark:bg-slate-900"
@@ -781,6 +813,8 @@ export const JobEditorPage: React.FC<JobEditorPageProps> = ({
                     value={currentTagInput}
                     onChange={(e) => setCurrentTagInput(e.target.value)}
                     onKeyDown={handleTagKeyDown}
+                    aria-label="Search or add skills and tags"
+                    placeholder="Search skills (3+ letters) or add comma-separated tags"
                     className="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-2 pl-8 pr-3 text-xs sm:text-sm text-slate-900 focus:bg-white focus:border-indigo-500 focus:outline-none dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-100 dark:focus:bg-slate-900 transition-all"
                   />
                 </div>
@@ -789,25 +823,42 @@ export const JobEditorPage: React.FC<JobEditorPageProps> = ({
                   onClick={() => handleAddTag()}
                   className="shrink-0 inline-flex items-center gap-1 rounded-xl bg-slate-100 px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer"
                 >
-                  <Plus className="h-3.5 w-3.5" />
                   <span>Add</span>
                 </button>
               </div>
 
-              {/* Quick suggestions */}
-              <div className="flex flex-wrap gap-1.5 items-center pt-1">
-                <span className="text-[10px] text-slate-400 mr-1">Suggested:</span>
-                {QUICK_TAG_SUGGESTIONS.filter(t => !tags.includes(t)).slice(0, 5).map((sugg) => (
-                  <button
-                    key={sugg}
-                    type="button"
-                    onClick={() => handleAddTag(sugg)}
-                    className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-indigo-950 dark:hover:text-indigo-300 transition-colors cursor-pointer"
-                  >
-                    + {sugg}
-                  </button>
-                ))}
-              </div>
+              {hasMinimumTagSearchLength ? (
+                <div className="flex flex-wrap gap-1.5 items-center pt-1" aria-live="polite">
+                  {matchingTagSuggestions.length > 0 ? (
+                    matchingTagSuggestions.map((sugg) => (
+                      <button
+                        key={sugg}
+                        type="button"
+                        onClick={() => handleAddTag(sugg)}
+                        className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-indigo-950 dark:hover:text-indigo-300 transition-colors cursor-pointer"
+                      >
+                        + {sugg}
+                      </button>
+                    ))
+                  ) : (
+                    <span className="text-[10px] text-slate-400">No matches. Press Add or Enter to save this skill.</span>
+                  )}
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-1.5 items-center pt-1">
+                  <span className="text-[10px] text-slate-400 mr-1">Suggested:</span>
+                  {QUICK_TAG_SUGGESTIONS.filter(t => !tags.some(tag => tag.toLocaleLowerCase() === t.toLocaleLowerCase())).slice(0, 5).map((sugg) => (
+                    <button
+                      key={sugg}
+                      type="button"
+                      onClick={() => handleAddTag(sugg)}
+                      className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-indigo-950 dark:hover:text-indigo-300 transition-colors cursor-pointer"
+                    >
+                      + {sugg}
+                    </button>
+                  ))}
+                </div>
+              )}
 
               {/* Tag Chips */}
               {tags.length > 0 && (

@@ -1,4 +1,10 @@
 import type { Plugin } from 'vite';
+
+// Allow opt-in TLS bypass only if explicitly requested for corporate/antivirus SSL proxies
+if (process.env.ALLOW_SELF_SIGNED_CERTS === 'true') {
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+}
+
 import {
   handleForgotPassword,
   handleVerifyRecoveryToken,

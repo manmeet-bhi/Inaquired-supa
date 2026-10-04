@@ -50,6 +50,14 @@ export function formatRelativeDate(isoDateStr?: string): string {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+export function sortJobsByNewest(jobs: Job[]): Job[] {
+  return [...jobs].sort((a, b) => {
+    const dateA = Date.parse(a.publishedAt || a.createdAt);
+    const dateB = Date.parse(b.publishedAt || b.createdAt);
+    return (Number.isFinite(dateB) ? dateB : 0) - (Number.isFinite(dateA) ? dateA : 0);
+  });
+}
+
 /**
  * Filters jobs according to filter state criteria
  */

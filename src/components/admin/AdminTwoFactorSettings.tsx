@@ -19,7 +19,9 @@ import {
   ArrowRight,
   Sparkles,
   HelpCircle,
-  ExternalLink
+  ExternalLink,
+  Clock,
+  Sparkle
 } from 'lucide-react';
 import {
   get2FaStatus,
@@ -34,6 +36,7 @@ import {
   BackupCodeItem
 } from '../../services/twoFactorService';
 import { AdminSessionUser } from '../../services/adminAuthService';
+import { TwoFactorOtpInput } from './TwoFactorOtpInput';
 
 interface AdminTwoFactorSettingsProps {
   adminUser: AdminSessionUser;
@@ -68,14 +71,13 @@ export const AdminTwoFactorSettings: React.FC<AdminTwoFactorSettingsProps> = ({
   const [totpVerifying, setTotpVerifying] = useState(false);
   const [totpError, setTotpError] = useState<string | null>(null);
   const [copiedSecret, setCopiedSecret] = useState(false);
+  const [totpSetupTab, setTotpSetupTab] = useState<'qr' | 'manual'>('qr');
 
   // Email 2FA state
   const [emailSending, setEmailSending] = useState(false);
-  const [emailSent, setEmailSent] = useState(false);
   const [emailCode, setEmailCode] = useState('');
   const [emailVerifying, setEmailVerifying] = useState(false);
   const [emailError, setEmailError] = useState<string | null>(null);
-  const [emailDevOtp, setEmailDevOtp] = useState<string | null>(null);
   const [emailCooldown, setEmailCooldown] = useState(0);
 
   // Backup codes state
@@ -83,10 +85,24 @@ export const AdminTwoFactorSettings: React.FC<AdminTwoFactorSettingsProps> = ({
   const [loadingBackupCodes, setLoadingBackupCodes] = useState(false);
   const [regeneratingBackup, setRegeneratingBackup] = useState(false);
   const [copiedAllCodes, setCopiedAllCodes] = useState(false);
+  const [copiedSingleCodeIndex, setCopiedSingleCodeIndex] = useState<number | null>(null);
 
   // Disabling state
   const [disablingTotp, setDisablingTotp] = useState(false);
   const [disablingEmail, setDisablingEmail] = useState(false);
+
+  // Close modals on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (isTotpModalOpen) setIsTotpModalOpen(false);
+        if (isEmailModalOpen) setIsEmailModalOpen(false);
+        if (isBackupModalOpen) setIsBackupModalOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isTotpModalOpen, isEmailModalOpen, isBackupModalOpen]);
 
   // Load 2FA status
   const loadStatus = async () => {
@@ -195,8 +211,6 @@ export const AdminTwoFactorSettings: React.FC<AdminTwoFactorSettingsProps> = ({
   const handleStartEmailSetup = async () => {
     setEmailError(null);
     setEmailCode('');
-    setEmailSent(false);
-    setEmailDevOtp(null);
     setIsEmailModalOpen(true);
     await handleSendEmailCode();
   };
@@ -209,11 +223,7 @@ export const AdminTwoFactorSettings: React.FC<AdminTwoFactorSettingsProps> = ({
       setEmailSending(true);
       const res = await sendEmail2FaCode(adminUser.email);
       if (res.success) {
-        setEmailSent(true);
         setEmailCooldown(60);
-        if (res.devOtp) {
-          setEmailDevOtp(res.devOtp);
-        }
         onShowToast(`Verification code sent to ${adminUser.email}`);
       } else {
         setEmailError(res.error || 'Failed to dispatch email verification code.');
@@ -318,6 +328,14 @@ export const AdminTwoFactorSettings: React.FC<AdminTwoFactorSettingsProps> = ({
     onShowToast('All backup codes copied to clipboard');
   };
 
+  // Copy single backup code
+  const handleCopySingleCode = (code: string, index: number) => {
+    navigator.clipboard.writeText(code);
+    setCopiedSingleCodeIndex(index);
+    setTimeout(() => setCopiedSingleCodeIndex(null), 2000);
+    onShowToast(`Backup code ${code} copied`);
+  };
+
   // Download backup codes as TXT
   const handleDownloadBackupCodes = () => {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -352,41 +370,52 @@ export const AdminTwoFactorSettings: React.FC<AdminTwoFactorSettingsProps> = ({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
+      <div className="flex flex-col gap-1">
+        <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-indigo-600 dark:text-indigo-400">
+          Account security
+        </span>
+        <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
+          Two-factor authentication
+        </h2>
+        <p className="max-w-2xl text-sm leading-relaxed text-slate-500 dark:text-slate-400">
+          Choose how to verify your identity when signing in, and keep recovery codes available in case you lose access.
+        </p>
+      </div>
       
       {/* Master 2FA Status Banner */}
-      <div className={`relative overflow-hidden rounded-2xl p-6 border transition-all ${
+      <div className={`relative overflow-hidden rounded-3xl border p-5 shadow-sm transition-all sm:p-6 ${
         status.twoFactorEnabled
-          ? 'bg-gradient-to-r from-emerald-950/80 via-emerald-900/60 to-slate-900 border-emerald-500/30 text-emerald-100 shadow-lg shadow-emerald-950/20'
-          : 'bg-gradient-to-r from-slate-900 via-indigo-950/40 to-slate-900 border-slate-800 text-slate-200'
+          ? 'border-emerald-200 bg-gradient-to-r from-emerald-50 via-white to-white dark:border-emerald-900/60 dark:from-emerald-950/40 dark:via-slate-900 dark:to-slate-900'
+          : 'border-slate-200 bg-gradient-to-r from-slate-50 via-white to-white dark:border-slate-800 dark:from-slate-900 dark:via-slate-900 dark:to-slate-900'
       }`}>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-start gap-4">
-            <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border ${
+            <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border ${
               status.twoFactorEnabled
-                ? 'bg-emerald-500/20 border-emerald-400/40 text-emerald-300'
-                : 'bg-slate-800 border-slate-700 text-slate-400'
+                ? 'border-emerald-200 bg-emerald-100 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300'
+                : 'border-amber-200 bg-amber-50 text-amber-600 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-300'
             }`}>
               {status.twoFactorEnabled ? (
-                <ShieldCheck className="h-6 w-6 text-emerald-400" />
+                <ShieldCheck className="h-6 w-6" />
               ) : (
-                <ShieldAlert className="h-6 w-6 text-amber-400" />
+                <ShieldAlert className="h-6 w-6" />
               )}
             </div>
             <div>
               <div className="flex items-center gap-2.5">
-                <h3 className="text-base font-bold text-white">
-                  Two-Factor Authentication (2FA)
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                  Sign-in protection
                 </h3>
                 <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold border ${
                   status.twoFactorEnabled
-                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
-                    : 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                    ? 'border-emerald-200 bg-emerald-100 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300'
+                    : 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-300'
                 }`}>
-                  {status.twoFactorEnabled ? 'ENFORCED & ACTIVE' : 'DISABLED'}
+                  {status.twoFactorEnabled ? 'PROTECTED' : 'NOT ENABLED'}
                 </span>
               </div>
-              <p className="text-xs text-slate-300 dark:text-slate-400 mt-1 max-w-xl">
+              <p className="mt-1 max-w-xl text-sm leading-relaxed text-slate-600 dark:text-slate-300">
                 {status.twoFactorEnabled
                   ? 'Your administrator account is protected with multi-factor authentication. Sign-in requires your password plus an authenticator code, email code, or emergency recovery key.'
                   : 'Add an extra layer of security. In addition to your password, you will be required to verify your identity using Google Authenticator or Email OTP.'}
@@ -399,7 +428,7 @@ export const AdminTwoFactorSettings: React.FC<AdminTwoFactorSettingsProps> = ({
               type="button"
               onClick={loadStatus}
               disabled={loading}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-xs font-semibold text-white hover:bg-white/20 transition-all cursor-pointer"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-semibold text-slate-700 transition-colors hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-indigo-700 dark:hover:bg-indigo-950/40 dark:hover:text-indigo-300"
               title="Refresh 2FA status"
             >
               <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
@@ -410,10 +439,10 @@ export const AdminTwoFactorSettings: React.FC<AdminTwoFactorSettingsProps> = ({
       </div>
 
       {/* Grid of 2FA Methods */}
-      <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         
         {/* METHOD 1: Google Authenticator (TOTP) */}
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900 shadow-xs flex flex-col justify-between">
+        <div className="flex flex-col justify-between rounded-3xl border border-slate-200 bg-white p-5 shadow-sm transition-colors hover:border-indigo-200 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-indigo-800 sm:p-6">
           <div>
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-3">
@@ -475,7 +504,6 @@ export const AdminTwoFactorSettings: React.FC<AdminTwoFactorSettingsProps> = ({
                 onClick={handleStartTotpSetup}
                 className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-bold text-white shadow-md shadow-indigo-600/20 hover:bg-indigo-700 transition-all cursor-pointer"
               >
-                <QrCode className="h-4 w-4" />
                 <span>Set Up Google Authenticator</span>
               </button>
             )}
@@ -483,7 +511,7 @@ export const AdminTwoFactorSettings: React.FC<AdminTwoFactorSettingsProps> = ({
         </div>
 
         {/* METHOD 2: Email Code (Resend) */}
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900 shadow-xs flex flex-col justify-between">
+        <div className="flex flex-col justify-between rounded-3xl border border-slate-200 bg-white p-5 shadow-sm transition-colors hover:border-blue-200 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-blue-900 sm:p-6">
           <div>
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-3">
@@ -495,7 +523,7 @@ export const AdminTwoFactorSettings: React.FC<AdminTwoFactorSettingsProps> = ({
                     Email Security Code
                   </h4>
                   <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                    Dispatched via Resend
+                    Sent by email
                   </span>
                 </div>
               </div>
@@ -545,7 +573,6 @@ export const AdminTwoFactorSettings: React.FC<AdminTwoFactorSettingsProps> = ({
                 onClick={handleStartEmailSetup}
                 className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-bold text-white shadow-md shadow-blue-600/20 hover:bg-blue-700 transition-all cursor-pointer"
               >
-                <Mail className="h-4 w-4" />
                 <span>Enable Email 2FA</span>
               </button>
             )}
@@ -555,7 +582,7 @@ export const AdminTwoFactorSettings: React.FC<AdminTwoFactorSettingsProps> = ({
       </div>
 
       {/* METHOD 3: Emergency Backup Recovery Codes Card */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900 shadow-xs">
+      <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-start gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-purple-50 text-purple-600 dark:bg-purple-950/60 dark:text-purple-400">
@@ -599,138 +626,208 @@ export const AdminTwoFactorSettings: React.FC<AdminTwoFactorSettingsProps> = ({
       {/* MODAL 1: GOOGLE AUTHENTICATOR SETUP WIZARD */}
       {/* ========================================================================= */}
       {isTotpModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="relative w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 sm:p-8 shadow-2xl dark:border-slate-800 dark:bg-slate-900 animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
-            
+        <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setIsTotpModalOpen(false);
+          }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200"
+        >
+          <div className="relative w-full max-w-3xl rounded-3xl border border-slate-200/90 bg-white/95 p-5 shadow-2xl backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/95 animate-in zoom-in-95 duration-200 max-h-[92vh] overflow-y-auto sm:p-6">
+
+            {/* Close Button */}
             <button
               type="button"
               onClick={() => setIsTotpModalOpen(false)}
-              className="absolute top-5 right-5 rounded-xl p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-white transition-colors cursor-pointer"
+              className="absolute top-5 right-5 rounded-xl p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-white transition-all hover:scale-105 cursor-pointer"
+              aria-label="Close modal"
             >
               <X className="h-5 w-5" />
             </button>
 
-            <div className="flex items-center gap-3 mb-4">
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400">
-                <QrCode className="h-6 w-6" />
+            {/* Modal Header */}
+            <div className="flex items-center gap-3.5 mb-5">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-lg shadow-indigo-500/25 ring-4 ring-indigo-50 dark:ring-indigo-950/40">
+                <Smartphone className="h-6 w-6" />
               </div>
               <div>
-                <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                  Set Up Google Authenticator
-                </h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Scan the QR code with your authenticator mobile app
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white tracking-tight">
+                    Set Up Google Authenticator
+                  </h3>
+                  <span className="rounded-full bg-indigo-50 px-2.5 py-0.5 text-[10px] font-bold text-indigo-700 dark:bg-indigo-950/70 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60">
+                    TOTP
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  Pair your mobile authenticator app for instant two-step verification
                 </p>
               </div>
             </div>
 
             {totpError && (
-              <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-400">
-                <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-                <span>{totpError}</span>
+              <div className="mb-5 flex items-start gap-2.5 rounded-2xl border border-rose-200 bg-rose-50/90 p-3.5 text-xs text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-300 animate-in fade-in">
+                <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-rose-600 dark:text-rose-400" />
+                <span className="leading-relaxed font-medium">{totpError}</span>
               </div>
             )}
 
             {totpLoading ? (
-              <div className="py-12 flex flex-col items-center justify-center text-center">
-                <span className="h-8 w-8 animate-spin rounded-full border-3 border-indigo-600 border-t-transparent dark:border-indigo-400" />
-                <p className="mt-3 text-xs text-slate-500">Generating secure cryptographic key...</p>
+              <div className="py-14 flex flex-col items-center justify-center text-center">
+                <div className="relative">
+                  <div className="h-12 w-12 rounded-full border-3 border-indigo-600/20 border-t-indigo-600 animate-spin dark:border-indigo-400/20 dark:border-t-indigo-400" />
+                  <Smartphone className="h-5 w-5 text-indigo-600 dark:text-indigo-400 absolute inset-0 m-auto animate-pulse" />
+                </div>
+                <p className="mt-4 text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  Generating secure cryptographic pairing key...
+                </p>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Using RFC 6238 compliant HMAC-SHA1 engine
+                </p>
               </div>
             ) : (
-              <div className="space-y-5">
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-6">
+                <div className="space-y-3">
                 
-                {/* Step 1: Scan QR Code */}
-                <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-800 dark:bg-slate-950/60 text-center">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 block mb-2">
-                    Step 1: Scan with Authenticator App
-                  </span>
-                  
-                  {totpQrCode && (
-                    <div className="inline-block p-3 bg-white rounded-2xl border border-slate-200 shadow-sm dark:border-slate-700">
-                      <img
-                        src={totpQrCode}
-                        alt="TOTP QR Code"
-                        className="h-44 w-44 rounded-lg object-contain mx-auto"
-                      />
+                {/* Method Switcher Tabs: QR Scanner vs Manual Key */}
+                <div className="flex rounded-xl bg-slate-100 p-1 dark:bg-slate-800/70">
+                  <button
+                    type="button"
+                    onClick={() => setTotpSetupTab('qr')}
+                    className={`flex-1 flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-bold transition-all cursor-pointer ${
+                      totpSetupTab === 'qr'
+                        ? 'bg-white text-indigo-600 shadow-xs dark:bg-slate-900 dark:text-indigo-400'
+                        : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
+                    }`}
+                  >
+                    <QrCode className="h-3.5 w-3.5" />
+                    <span>Scan QR Code</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setTotpSetupTab('manual')}
+                    className={`flex-1 flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-bold transition-all cursor-pointer ${
+                      totpSetupTab === 'manual'
+                        ? 'bg-white text-indigo-600 shadow-xs dark:bg-slate-900 dark:text-indigo-400'
+                        : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
+                    }`}
+                  >
+                    <KeyRound className="h-3.5 w-3.5" />
+                    <span>Enter Key Manually</span>
+                  </button>
+                </div>
+
+                {/* Tab 1: QR Code Scanner Viewfinder */}
+                {totpSetupTab === 'qr' && (
+                  <div className="rounded-2xl border border-slate-200/80 bg-slate-50/80 p-4 text-center dark:border-slate-800 dark:bg-slate-950/60 animate-in fade-in duration-150">
+                    <p className="mb-3 text-xs font-semibold text-slate-700 dark:text-slate-300">
+                      Open your authenticator app and scan this QR code:
+                    </p>
+
+                    {totpQrCode && (
+                      <div className="relative inline-block p-4 bg-white rounded-2xl border-2 border-indigo-500/20 shadow-lg dark:border-indigo-400/20 transition-all hover:scale-[1.01]">
+                        {/* Viewfinder corner decorative marks */}
+                        <div className="absolute top-2 left-2 w-3 h-3 border-t-2 border-l-2 border-indigo-600 rounded-tl-sm pointer-events-none" />
+                        <div className="absolute top-2 right-2 w-3 h-3 border-t-2 border-r-2 border-indigo-600 rounded-tr-sm pointer-events-none" />
+                        <div className="absolute bottom-2 left-2 w-3 h-3 border-b-2 border-l-2 border-indigo-600 rounded-bl-sm pointer-events-none" />
+                        <div className="absolute bottom-2 right-2 w-3 h-3 border-b-2 border-r-2 border-indigo-600 rounded-br-sm pointer-events-none" />
+
+                        <img
+                          src={totpQrCode}
+                          alt="Google Authenticator TOTP QR Code"
+                          className="mx-auto h-36 w-36 rounded-lg object-contain sm:h-40 sm:w-40"
+                        />
+                      </div>
+                    )}
+
+                    {/* Supported apps pill list */}
+                    <div className="mt-3 border-t border-slate-200/60 pt-3 text-[11px] text-slate-500 dark:border-slate-800/60 dark:text-slate-400">
+                      Works with Google Authenticator, Microsoft Authenticator, 1Password, and Apple Passwords.
                     </div>
-                  )}
-
-                  <p className="mt-3 text-[11px] text-slate-500 dark:text-slate-400">
-                    Works with Google Authenticator, Microsoft Authenticator, 1Password, Authy &amp; Apple Passwords.
-                  </p>
-                </div>
-
-                {/* Step 2: Manual Entry Option */}
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                    Step 2: Or enter this secret key manually
-                  </label>
-                  <div className="relative flex items-center">
-                    <input
-                      type="text"
-                      readOnly
-                      value={totpFormattedSecret}
-                      className="w-full rounded-xl border border-slate-300 bg-slate-100/80 py-2 pl-3.5 pr-20 text-xs font-mono font-bold text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 select-all"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleCopySecret}
-                      className="absolute right-1.5 flex items-center gap-1 rounded-lg bg-indigo-50 px-2.5 py-1 text-[11px] font-semibold text-indigo-600 hover:bg-indigo-100 dark:bg-indigo-950/80 dark:text-indigo-300 transition-colors cursor-pointer"
-                    >
-                      {copiedSecret ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
-                      <span>{copiedSecret ? 'Copied' : 'Copy'}</span>
-                    </button>
                   </div>
+                )}
+
+                {/* Tab 2: Manual Key Entry View */}
+                {totpSetupTab === 'manual' && (
+                  <div className="space-y-3 rounded-2xl border border-slate-200/80 bg-slate-50/80 p-4 dark:border-slate-800 dark:bg-slate-950/60 animate-in fade-in duration-150">
+                    <div className="space-y-1.5">
+                      <span className="block text-[11px] font-bold tracking-wide text-slate-700 dark:text-slate-300">
+                        Manual setup key
+                      </span>
+                      <p className="max-w-sm text-[10px] leading-relaxed text-slate-500 dark:text-slate-400">
+                        If your camera cannot scan the QR code, manually add an account in your app and paste this key.
+                      </p>
+
+                      <div className="flex items-center gap-2 pt-1">
+                        <div className="min-w-0 flex-1 rounded-xl border border-slate-300 bg-white p-3 text-center font-mono text-xs font-bold leading-relaxed tracking-[0.16em] text-indigo-950 dark:border-slate-700 dark:bg-slate-900 dark:text-indigo-200 select-all break-all sm:text-sm">
+                          {totpFormattedSecret || totpSecret}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleCopySecret}
+                          className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl bg-indigo-600 px-3 py-2.5 text-[11px] font-bold text-white shadow-md shadow-indigo-600/20 transition-all hover:bg-indigo-700 sm:px-3.5 sm:text-xs"
+                          title="Copy key to clipboard"
+                        >
+                          {copiedSecret ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                          <span>{copiedSecret ? 'Copied' : 'Copy'}</span>
+                        </button>
+                      </div>
+                    </div>
+
+                  </div>
+                )}
                 </div>
 
-                {/* Step 3: Verify 6-digit Code */}
-                <form onSubmit={handleVerifyTotp} className="space-y-4 pt-2 border-t border-slate-100 dark:border-slate-800">
-                  <div>
+                {/* Step 2: Enter 6-digit Code */}
+                <form onSubmit={handleVerifyTotp} className="flex flex-col justify-center space-y-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950/50 sm:p-5">
+                  <div className="space-y-2 text-center">
                     <label 
                       htmlFor="totp_verify_code"
-                      className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1.5"
+                      className="block text-xs font-bold text-slate-800 dark:text-slate-200"
                     >
-                      Step 3: Enter the 6-digit code shown in your app
+                      Enter the 6-Digit Code Shown in Your App
                     </label>
-                    <div className="relative">
-                      <input
-                        id="totp_verify_code"
-                        type="text"
-                        inputMode="numeric"
-                        autoComplete="one-time-code"
-                        pattern="[0-9]*"
-                        maxLength={6}
-                        required
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center justify-center gap-1">
+                      <Clock className="h-3 w-3 text-indigo-500" />
+                      <span>Codes automatically refresh every 30 seconds</span>
+                    </p>
+
+                    <div className="pt-2">
+                      <TwoFactorOtpInput
                         value={totpCode}
-                        onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                        placeholder="000 000"
-                        className="w-full rounded-xl border border-indigo-300 bg-indigo-50/40 py-3 text-center text-xl font-mono font-black tracking-[8px] text-slate-900 placeholder:text-slate-400 focus:border-indigo-600 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 dark:border-indigo-800 dark:bg-indigo-950/30 dark:text-white"
+                        onChange={setTotpCode}
+                        onComplete={() => {
+                          // Auto trigger submission if completed
+                        }}
+                        accentColor="indigo"
+                        disabled={totpVerifying}
+                        error={Boolean(totpError)}
                       />
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-end gap-3 pt-2">
+                  {/* Actions */}
+                  <div className="flex items-center justify-end gap-3 pt-3">
                     <button
                       type="button"
                       onClick={() => setIsTotpModalOpen(false)}
-                      className="rounded-xl border border-slate-300 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                      className="rounded-xl border border-slate-300 px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                     >
                       Cancel
                     </button>
                     <button
                       type="submit"
                       disabled={totpVerifying || totpCode.trim().length !== 6}
-                      className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2 text-xs font-bold text-white shadow-md shadow-indigo-600/20 hover:bg-indigo-700 disabled:opacity-50 transition-all cursor-pointer"
+                      className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-5 py-2.5 text-xs font-bold text-white shadow-lg shadow-indigo-600/25 hover:from-indigo-500 hover:to-violet-500 disabled:opacity-50 transition-all hover:scale-[1.01] cursor-pointer"
                     >
                       {totpVerifying ? (
                         <>
                           <RefreshCw className="h-4 w-4 animate-spin" />
-                          <span>Verifying...</span>
+                          <span>Verifying Code...</span>
                         </>
                       ) : (
                         <>
-                          <ShieldCheck className="h-4 w-4" />
-                          <span>Verify &amp; Activate</span>
+                          <span>Verify &amp; Activate 2FA</span>
                         </>
                       )}
                     </button>
@@ -745,80 +842,98 @@ export const AdminTwoFactorSettings: React.FC<AdminTwoFactorSettingsProps> = ({
       )}
 
       {/* ========================================================================= */}
-      {/* MODAL 2: EMAIL 2FA SETUP / TEST */}
+      {/* MODAL 2: EMAIL 2FA SETUP & VERIFICATION */}
       {/* ========================================================================= */}
       {isEmailModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="relative w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 sm:p-8 shadow-2xl dark:border-slate-800 dark:bg-slate-900 animate-in zoom-in-95 duration-200">
+        <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setIsEmailModalOpen(false);
+          }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200"
+        >
+          <div className="relative w-full max-w-lg rounded-3xl border border-slate-200/90 bg-white/95 p-6 sm:p-8 shadow-2xl backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/95 animate-in zoom-in-95 duration-200">
             
+            {/* Close Button */}
             <button
               type="button"
               onClick={() => setIsEmailModalOpen(false)}
-              className="absolute top-5 right-5 rounded-xl p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-white transition-colors cursor-pointer"
+              className="absolute top-5 right-5 rounded-xl p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-white transition-all hover:scale-105 cursor-pointer"
+              aria-label="Close modal"
             >
               <X className="h-5 w-5" />
             </button>
 
-            <div className="flex items-center gap-3 mb-4">
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400">
+            {/* Modal Header */}
+            <div className="flex items-center gap-3.5 mb-5 pr-8">
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/25 ring-4 ring-blue-50 dark:ring-blue-950/40">
                 <Mail className="h-6 w-6" />
               </div>
-              <div>
-                <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                  Email Two-Factor Authentication
+              <div className="min-w-0">
+                <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white tracking-tight">
+                  Email Security Verification
                 </h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Verify receipt of security code via Resend
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  Single-use code dispatched to your verified administrator inbox
                 </p>
               </div>
             </div>
 
             {emailError && (
-              <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-400">
-                <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-                <span>{emailError}</span>
+              <div className="mb-4 flex items-start gap-2.5 rounded-2xl border border-rose-200 bg-rose-50/90 p-3.5 text-xs text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-300 animate-in fade-in">
+                <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-rose-600 dark:text-rose-400" />
+                <span className="leading-relaxed font-medium">{emailError}</span>
               </div>
             )}
 
-            <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-4 dark:border-blue-900/40 dark:bg-blue-950/40 mb-5">
-              <p className="text-xs text-blue-900 dark:text-blue-200 leading-relaxed">
-                A 6-digit verification code has been dispatched to:
-              </p>
-              <p className="text-xs font-bold text-blue-950 dark:text-white mt-1">
-                {adminUser.email}
-              </p>
-              {import.meta.env.DEV && emailDevOtp && (
-                <div className="mt-2.5 pt-2 border-t border-blue-200/60 dark:border-blue-800/60 flex items-center justify-between text-[11px]">
-                  <span className="text-blue-700 dark:text-blue-300 font-semibold">Dev Fallback Code:</span>
-                  <span className="font-mono font-bold text-blue-900 dark:text-white tracking-widest">{emailDevOtp}</span>
+            {/* Mailbox Status Card */}
+            <div className="rounded-2xl border border-blue-200/70 bg-gradient-to-br from-blue-50/80 via-indigo-50/40 to-slate-50/80 p-4 dark:border-blue-900/40 dark:from-blue-950/50 dark:via-indigo-950/30 dark:to-slate-950/50 mb-5">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <span className="text-[11px] font-semibold text-blue-800 dark:text-blue-300">
+                    Dispatched to mailbox:
+                  </span>
+                  <p className="text-sm font-bold text-slate-900 dark:text-white mt-0.5 flex items-center gap-1.5">
+                    <span className="truncate max-w-[240px]">{adminUser.email}</span>
+                    <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
+                  </p>
                 </div>
-              )}
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/70 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800/50">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-ping" />
+                  Live OTP
+                </span>
+              </div>
+
             </div>
 
+            {/* Verification Form */}
             <form onSubmit={handleVerifyEmail} className="space-y-4">
-              <div>
+              <div className="space-y-2 text-center">
                 <label 
                   htmlFor="email_verify_code"
-                  className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1.5"
+                  className="block text-xs font-bold text-slate-800 dark:text-slate-200"
                 >
                   Enter the 6-Digit Email Code
                 </label>
-                <input
-                  id="email_verify_code"
-                  type="text"
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                  pattern="[0-9]*"
-                  maxLength={6}
-                  required
-                  value={emailCode}
-                  onChange={(e) => setEmailCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                  placeholder="000 000"
-                  className="w-full rounded-xl border border-blue-300 bg-blue-50/40 py-3 text-center text-xl font-mono font-black tracking-[8px] text-slate-900 placeholder:text-slate-400 focus:border-blue-600 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 dark:border-blue-800 dark:bg-blue-950/30 dark:text-white"
-                />
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  Type or paste the code received in your inbox
+                </p>
+
+                <div className="pt-2">
+                  <TwoFactorOtpInput
+                    value={emailCode}
+                    onChange={setEmailCode}
+                    onComplete={() => {
+                      // Ready to submit
+                    }}
+                    accentColor="blue"
+                    disabled={emailVerifying}
+                    error={Boolean(emailError)}
+                  />
+                </div>
               </div>
 
-              <div className="flex items-center justify-between text-xs pt-1">
+              {/* Resend Action Row */}
+              <div className="flex items-center justify-between text-xs pt-1 px-1">
                 <span className="text-slate-500 dark:text-slate-400 text-[11px]">
                   Didn't receive email?
                 </span>
@@ -826,28 +941,37 @@ export const AdminTwoFactorSettings: React.FC<AdminTwoFactorSettingsProps> = ({
                   type="button"
                   onClick={handleSendEmailCode}
                   disabled={emailSending || emailCooldown > 0}
-                  className="font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 disabled:opacity-50 transition-colors cursor-pointer text-[11px]"
+                  className="font-bold text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 disabled:opacity-50 transition-colors cursor-pointer text-[11px] flex items-center gap-1"
                 >
-                  {emailSending
-                    ? 'Sending...'
-                    : emailCooldown > 0
-                    ? `Resend in ${emailCooldown}s`
-                    : 'Resend Code'}
+                  {emailSending ? (
+                    <>
+                      <RefreshCw className="h-3 w-3 animate-spin" />
+                      <span>Sending...</span>
+                    </>
+                  ) : emailCooldown > 0 ? (
+                    <span>Resend in {emailCooldown}s</span>
+                  ) : (
+                    <>
+                      <RefreshCw className="h-3 w-3" />
+                      <span>Resend Code</span>
+                    </>
+                  )}
                 </button>
               </div>
 
+              {/* Action Buttons */}
               <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
                 <button
                   type="button"
                   onClick={() => setIsEmailModalOpen(false)}
-                  className="rounded-xl border border-slate-300 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                  className="rounded-xl border border-slate-300 px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={emailVerifying || emailCode.trim().length !== 6}
-                  className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2 text-xs font-bold text-white shadow-md shadow-blue-600/20 hover:bg-blue-700 disabled:opacity-50 transition-all cursor-pointer"
+                  className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-2.5 text-xs font-bold text-white shadow-lg shadow-blue-600/25 hover:from-blue-500 hover:to-indigo-500 disabled:opacity-50 transition-all hover:scale-[1.01] cursor-pointer"
                 >
                   {emailVerifying ? (
                     <>
@@ -856,7 +980,6 @@ export const AdminTwoFactorSettings: React.FC<AdminTwoFactorSettingsProps> = ({
                     </>
                   ) : (
                     <>
-                      <ShieldCheck className="h-4 w-4" />
                       <span>Verify &amp; Activate</span>
                     </>
                   )}
@@ -872,94 +995,123 @@ export const AdminTwoFactorSettings: React.FC<AdminTwoFactorSettingsProps> = ({
       {/* MODAL 3: VIEW & MANAGE BACKUP RECOVERY CODES */}
       {/* ========================================================================= */}
       {isBackupModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="relative w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 sm:p-8 shadow-2xl dark:border-slate-800 dark:bg-slate-900 animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
+        <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setIsBackupModalOpen(false);
+          }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200"
+        >
+          <div className="relative w-full max-w-lg rounded-3xl border border-slate-200/90 bg-white/95 p-6 sm:p-8 shadow-2xl backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/95 animate-in zoom-in-95 duration-200 max-h-[92vh] overflow-y-auto">
             
+            {/* Close Button */}
             <button
               type="button"
               onClick={() => setIsBackupModalOpen(false)}
-              className="absolute top-5 right-5 rounded-xl p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-white transition-colors cursor-pointer"
+              className="absolute top-5 right-5 rounded-xl p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-white transition-all hover:scale-105 cursor-pointer"
+              aria-label="Close modal"
             >
               <X className="h-5 w-5" />
             </button>
 
-            <div className="flex items-center gap-3 mb-4">
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-purple-50 text-purple-600 dark:bg-purple-950/60 dark:text-purple-400">
+            {/* Modal Header */}
+            <div className="flex items-center gap-3.5 mb-5">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-purple-500 to-fuchsia-600 text-white shadow-lg shadow-purple-500/25 ring-4 ring-purple-50 dark:ring-purple-950/40">
                 <FileText className="h-6 w-6" />
               </div>
               <div>
-                <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                  Backup Recovery Codes
-                </h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Save these single-use recovery codes in a secure location
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white tracking-tight">
+                    Emergency Backup Recovery Codes
+                  </h3>
+                  <span className="rounded-full bg-purple-50 px-2.5 py-0.5 text-[10px] font-bold text-purple-700 dark:bg-purple-950/70 dark:text-purple-300 border border-purple-200/60 dark:border-purple-800/60">
+                    Vault Keys
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  Single-use fallback keys to access your administrator account
                 </p>
               </div>
             </div>
 
-            <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-3.5 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-300 mb-5 leading-relaxed">
-              <span className="font-bold">Important Notice:</span> If you lose your phone or are unable to receive email codes, these backup keys are the only way to recover access to your administrator account.
+            {/* Warning Notice */}
+            <div className="rounded-2xl border border-amber-200/80 bg-amber-50/80 p-3.5 text-xs text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-200 mb-5 leading-relaxed flex items-start gap-2.5">
+              <AlertCircle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
+              <div>
+                <strong className="font-bold">Important Notice:</strong> Keep these codes in a secure password vault (e.g. 1Password, Bitwarden) or print them out. Each code can be used exactly once if you ever lose access to your primary 2FA method.
+              </div>
             </div>
 
             {loadingBackupCodes ? (
-              <div className="py-12 flex flex-col items-center justify-center text-center">
-                <span className="h-8 w-8 animate-spin rounded-full border-3 border-purple-600 border-t-transparent dark:border-purple-400" />
-                <p className="mt-3 text-xs text-slate-500">Retrieving backup codes...</p>
+              <div className="py-14 flex flex-col items-center justify-center text-center">
+                <div className="h-10 w-10 animate-spin rounded-full border-3 border-purple-600 border-t-transparent dark:border-purple-400" />
+                <p className="mt-3 text-xs font-semibold text-slate-700 dark:text-slate-300">Retrieving backup recovery codes...</p>
               </div>
             ) : backupCodes.length === 0 ? (
-              <div className="py-8 text-center space-y-3">
-                <p className="text-xs text-slate-500 dark:text-slate-400">
+              <div className="py-8 text-center space-y-3.5 rounded-2xl border border-slate-200 bg-slate-50 p-6 dark:border-slate-800 dark:bg-slate-950">
+                <p className="text-xs text-slate-600 dark:text-slate-400">
                   No backup codes found for this account. Generate your emergency recovery codes below:
                 </p>
                 <button
                   type="button"
                   onClick={handleRegenerateBackup}
                   disabled={regeneratingBackup}
-                  className="inline-flex items-center gap-2 rounded-xl bg-purple-600 px-4 py-2.5 text-xs font-bold text-white shadow-md shadow-purple-600/20 hover:bg-purple-700 transition-all cursor-pointer"
+                  className="inline-flex items-center gap-2 rounded-xl bg-purple-600 px-5 py-2.5 text-xs font-bold text-white shadow-md shadow-purple-600/20 hover:bg-purple-700 transition-all cursor-pointer"
                 >
                   <KeyRound className="h-4 w-4" />
-                  <span>Generate Backup Codes</span>
+                  <span>Generate 10 Backup Codes</span>
                 </button>
               </div>
             ) : (
               <div className="space-y-5">
                 {/* 2-column grid of codes */}
-                <div className="grid grid-cols-2 gap-2.5 p-4 rounded-2xl border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-950 font-mono text-xs">
-                  {backupCodes.map((item, idx) => (
-                    <div
-                      key={idx}
-                      className={`flex items-center justify-between p-2 rounded-lg border transition-colors ${
-                        item.used
-                          ? 'border-slate-200 bg-slate-100 text-slate-400 line-through dark:border-slate-800 dark:bg-slate-900/50 dark:text-slate-600'
-                          : 'border-slate-200 bg-white font-bold text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 shadow-2xs'
-                      }`}
-                    >
-                      <span className="tracking-wider">{item.code}</span>
-                      {item.used && (
-                        <span className="text-[10px] font-sans font-semibold uppercase text-slate-400 no-underline">
-                          Used
-                        </span>
-                      )}
-                    </div>
-                  ))}
+                <div className="grid grid-cols-2 gap-2.5 p-3.5 rounded-2xl border border-slate-200 bg-slate-50/80 dark:border-slate-800 dark:bg-slate-950/60 font-mono text-xs">
+                  {backupCodes.map((item, idx) => {
+                    const isCopied = copiedSingleCodeIndex === idx;
+                    return (
+                      <div
+                        key={idx}
+                        className={`group flex items-center justify-between p-2.5 rounded-xl border transition-all ${
+                          item.used
+                            ? 'border-slate-200 bg-slate-100 text-slate-400 line-through dark:border-slate-800 dark:bg-slate-900/50 dark:text-slate-600'
+                            : 'border-slate-200 bg-white font-bold text-slate-900 hover:border-purple-300 hover:shadow-xs dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:border-purple-600'
+                        }`}
+                      >
+                        <span className="tracking-wider text-xs sm:text-sm">{item.code}</span>
+                        {item.used ? (
+                          <span className="text-[9px] font-sans font-bold uppercase text-slate-400 no-underline px-1.5 py-0.5 rounded-md bg-slate-200/60 dark:bg-slate-800">
+                            Used
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleCopySingleCode(item.code, idx)}
+                            className="rounded-lg p-1 text-slate-400 hover:bg-purple-50 hover:text-purple-600 dark:hover:bg-purple-950/60 dark:hover:text-purple-400 transition-colors cursor-pointer"
+                            title="Copy this code"
+                          >
+                            {isCopied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
 
-                {/* Actions: Copy All, Download TXT, Regenerate */}
-                <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+                {/* Bulk Actions: Copy All, Download TXT, Regenerate */}
+                <div className="flex flex-wrap items-center justify-between gap-2.5 pt-1">
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
                       onClick={handleCopyAllBackupCodes}
-                      className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 transition-all hover:scale-[1.01] cursor-pointer"
                     >
                       {copiedAllCodes ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
-                      <span>{copiedAllCodes ? 'Copied' : 'Copy All'}</span>
+                      <span>{copiedAllCodes ? 'All Copied' : 'Copy All'}</span>
                     </button>
 
                     <button
                       type="button"
                       onClick={handleDownloadBackupCodes}
-                      className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 transition-all hover:scale-[1.01] cursor-pointer"
                     >
                       <Download className="h-3.5 w-3.5" />
                       <span>Download .TXT</span>
@@ -979,11 +1131,15 @@ export const AdminTwoFactorSettings: React.FC<AdminTwoFactorSettingsProps> = ({
               </div>
             )}
 
-            <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800 text-right">
+            {/* Bottom Done Bar */}
+            <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+              <span className="text-[11px] text-slate-400">
+                Safe storage confirmed
+              </span>
               <button
                 type="button"
                 onClick={() => setIsBackupModalOpen(false)}
-                className="rounded-xl bg-slate-900 px-5 py-2 text-xs font-semibold text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white transition-colors cursor-pointer"
+                className="rounded-xl bg-slate-900 px-6 py-2.5 text-xs font-bold text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white transition-all hover:scale-[1.02] cursor-pointer"
               >
                 Done
               </button>

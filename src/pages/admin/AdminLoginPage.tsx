@@ -1,18 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
-  Lock, 
   Mail, 
+  Lock,
   ArrowLeft, 
   Eye, 
   EyeOff, 
-  ShieldCheck, 
   AlertCircle, 
   KeyRound,
   Smartphone,
   RefreshCw,
   CheckCircle2,
   ChevronLeft,
-  FileText
+  FileText,
+  Clock,
 } from 'lucide-react';
 import { signInAdmin, AdminSessionUser } from '../../services/adminAuthService';
 import { 
@@ -21,6 +21,8 @@ import {
   verifyLogin2Fa, 
   TwoFactorStatus 
 } from '../../services/twoFactorService';
+import { TwoFactorOtpInput } from '../../components/admin/TwoFactorOtpInput';
+import { AdminAuthLayout } from '../../components/admin/AdminAuthLayout';
 
 interface AdminLoginPageProps {
   onLoginSuccess: (user: AdminSessionUser) => void;
@@ -31,8 +33,8 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
   onLoginSuccess, 
   onNavigate 
 }) => {
-  // Step: 'credentials' | '2fa'
-  const [step, setStep] = useState<'credentials' | '2fa'>('credentials');
+  // Sign-in proceeds from account identification to password, then optional 2FA.
+  const [step, setStep] = useState<'email' | 'password' | '2fa'>('email');
 
   // Credentials form state
   const [email, setEmail] = useState('');
@@ -70,14 +72,27 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
     return () => clearInterval(interval);
   }, [emailCooldown]);
 
-  // Step 1: Submit email & password
-  const handleCredentialsSubmit = async (e: React.FormEvent) => {
+  const handleEmailSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMessage(null);
+
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+      setErrorMessage('Enter a valid email address to continue.');
+      return;
+    }
+    setEmail(cleanEmail);
+    setStep('password');
+  };
+
+  // Authenticate with the email entered in the previous step.
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
 
     const cleanEmail = email.trim().toLowerCase();
     if (!cleanEmail || !password) {
-      setErrorMessage('Please enter both your administrator email and password.');
+      setErrorMessage('Enter your password to continue.');
       return;
     }
 
@@ -156,7 +171,7 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
 
     if (!pendingUser) {
       setErrorMessage('Session expired. Please sign in again.');
-      setStep('credentials');
+      setStep('email');
       return;
     }
 
@@ -198,121 +213,127 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
   };
 
   return (
-    <div className="min-h-screen flex flex-col justify-center items-center px-4 py-12 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors">
-      
-      {/* Background Accent Gradients */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl dark:bg-indigo-500/15" />
-        <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-emerald-500/10 rounded-full blur-3xl dark:bg-emerald-500/10" />
-      </div>
-
-      <div className="relative w-full max-w-md">
-        {/* Card Container */}
-        <div className="rounded-3xl border border-slate-200 bg-white/90 p-8 shadow-2xl backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/90 transition-all duration-300">
-          
+    <AdminAuthLayout
+      heading={step === '2fa' ? 'Verify it’s you' : step === 'password' ? 'Welcome back' : 'Sign in'}
+      description={
+        step === '2fa'
+          ? 'Complete the next security step to access your Inaquired admin workspace.'
+          : step === 'password'
+            ? 'Enter your password to continue to your Inaquired admin workspace.'
+            : 'Use your Inaquired administrator account to manage your hiring workspace.'
+      }
+    >
           {/* =============================================================== */}
           {/* STEP 1: EMAIL & PASSWORD CREDENTIALS */}
           {/* =============================================================== */}
-          {step === 'credentials' && (
+          {(step === 'email' || step === 'password') && (
             <div className="animate-in fade-in duration-200">
-              {/* Logo & Header */}
-              <div className="flex flex-col items-center text-center space-y-2.5">
-                <img 
-                  src="/logo/logo.svg" 
-                  alt="inaquired" 
-                  className="site-logo h-8 w-auto object-contain" 
-                />
-                <div>
-                  <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
-                    Admin Console
-                  </h1>
-                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                    Sign in with your administrator credentials
-                  </p>
-                </div>
-              </div>
+              {step === 'password' && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStep('email');
+                    setPassword('');
+                    setErrorMessage(null);
+                  }}
+                  className="mb-5 inline-flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
+                  aria-label="Change email address"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  <span className="max-w-[260px] truncate">{email}</span>
+                </button>
+              )}
 
               {/* Alert Message */}
               {errorMessage && (
-                <div className="mt-5 flex items-start gap-2 rounded-xl bg-rose-50 border border-rose-200 p-3 text-xs text-rose-700 dark:bg-rose-950/40 dark:border-rose-900/50 dark:text-rose-400 animate-in fade-in">
+                <div className="mb-5 flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700 animate-in fade-in dark:border-rose-900 dark:bg-rose-950/50 dark:text-rose-200">
                   <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
                   <span>{errorMessage}</span>
                 </div>
               )}
 
               {/* Form */}
-              <form onSubmit={handleCredentialsSubmit} className="mt-6 space-y-4">
-
-                {/* Email Field */}
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                    Administrator Email
-                  </label>
-                  <div className="relative">
-                    <Mail className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
-                    <input
-                      type="email"
-                      required
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-3 text-sm text-slate-900 focus:border-indigo-500 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100"
-                    />
+              {step === 'email' ? (
+                <form onSubmit={handleEmailSubmit} className="space-y-6">
+                  <div>
+                  <label htmlFor="admin-login-email" className="sr-only">
+                      Email address
+                    </label>
+                    <div className="relative">
+                      <Mail className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+                      <input
+                        id="admin-login-email"
+                        type="email"
+                        autoComplete="username"
+                        required
+                        autoFocus
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="Enter your email address"
+                        className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-12 pr-4 text-sm text-slate-900 placeholder:text-slate-400 shadow-xs transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500"
+                      />
+                    </div>
                   </div>
-                </div>
-
-                {/* Password Field */}
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  <button
+                    type="submit"
+                    className="ml-auto inline-flex min-w-24 items-center justify-center rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-indigo-600/20 transition-all hover:bg-indigo-700 active:scale-[0.98]"
+                  >
+                    Next
+                  </button>
+                </form>
+              ) : (
+                <form onSubmit={handlePasswordSubmit} className="space-y-6">
+                  <div>
+                    <label htmlFor="admin-login-password" className="sr-only">
                       Password
                     </label>
-                    <button
-                      type="button"
-                      onClick={() => onNavigate('/admin/forgot-password')}
-                      className="text-[11px] font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 hover:underline transition-colors"
-                    >
-                      Forgot password?
-                    </button>
-                  </div>
                   <div className="relative">
-                    <Lock className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
+                    <Lock className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" aria-hidden="true" />
                     <input
+                      id="admin-login-password"
                       type={showPassword ? 'text' : 'password'}
+                      autoComplete="current-password"
+                      autoFocus
                       required
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-10 text-sm text-slate-900 focus:border-indigo-500 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100"
+                      placeholder="Enter your password"
+                      className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-12 pr-12 text-sm text-slate-900 placeholder:text-slate-400 shadow-xs transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500"
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3.5 top-3 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white cursor-pointer"
                       aria-label={showPassword ? 'Hide password' : 'Show password'}
                     >
                       {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
                   </div>
-                </div>
-
-                {/* Submit Button */}
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="mt-2 w-full inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 py-3 text-xs font-semibold text-white shadow-lg shadow-indigo-600/25 hover:bg-indigo-500 disabled:opacity-50 transition-all hover:scale-[1.01] cursor-pointer"
-                >
-                  {loading ? (
-                    <>
-                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                      <span>Authenticating...</span>
-                    </>
-                  ) : (
-                    <>
-                      <ShieldCheck className="h-4 w-4" />
-                      <span>Sign In</span>
-                    </>
-                  )}
-                </button>
-              </form>
+                    <div className="mt-2 flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => onNavigate('/admin/forgot-password')}
+                        className="text-sm font-medium text-indigo-700 hover:underline transition-colors dark:text-indigo-300 dark:hover:text-indigo-200"
+                      >
+                        Forgot password?
+                      </button>
+                    </div>
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    aria-busy={loading}
+                    className="ml-auto inline-flex min-w-28 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-indigo-600/20 transition-all hover:bg-indigo-700 active:scale-[0.98] disabled:opacity-50"
+                  >
+                    {loading ? (
+                      <>
+                        <RefreshCw aria-hidden="true" className="h-4 w-4 shrink-0 animate-spin" />
+                        <span>Signing in...</span>
+                      </>
+                    ) : 'Sign in'}
+                  </button>
+                </form>
+              )}
             </div>
           )}
 
@@ -326,32 +347,20 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
               <button
                 type="button"
                 onClick={() => {
-                  setStep('credentials');
+                  setStep('password');
                   setErrorMessage(null);
                   setTwoFaCode('');
                 }}
-                className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors cursor-pointer mb-4"
+                className="mb-4 inline-flex items-center gap-1 text-sm font-medium text-slate-300 transition-colors hover:text-white"
               >
                 <ChevronLeft className="h-4 w-4" />
-                <span>Back to password</span>
+                        <span>Back to sign in</span>
               </button>
 
               {/* Header */}
-              <div className="flex flex-col items-center text-center space-y-2 mb-5">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-100 text-indigo-600 dark:bg-indigo-950/80 dark:text-indigo-400 shadow-xs ring-4 ring-indigo-50 dark:ring-indigo-950/50">
-                  <ShieldCheck className="h-6 w-6" />
-                </div>
-                <div>
-                  <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
-                    Two-Factor Authentication
-                  </h2>
-                  <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                    Verify your identity to complete administrator login
-                  </p>
-                </div>
-
-                {/* User chip */}
-                <div className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200 mt-1">
+              <div className="mb-5">
+                {/* User identity */}
+                <div className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-[#3c4043] bg-[#202124] px-3 py-1 text-xs font-semibold text-slate-200">
                   <span className="flex h-4 w-4 items-center justify-center rounded-full bg-indigo-600 text-[10px] text-white font-bold">
                     {(pendingUser.fullName || pendingUser.email || 'A').charAt(0).toUpperCase()}
                   </span>
@@ -361,7 +370,7 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
 
               {/* Alert Message */}
               {errorMessage && (
-                <div className="mb-4 flex items-start gap-2 rounded-xl bg-rose-50 border border-rose-200 p-3 text-xs text-rose-700 dark:bg-rose-950/40 dark:border-rose-900/50 dark:text-rose-400 animate-in fade-in">
+                <div className="mb-4 flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700 animate-in fade-in dark:border-rose-900 dark:bg-rose-950/50 dark:text-rose-200">
                   <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
                   <span>{errorMessage}</span>
                 </div>
@@ -433,73 +442,73 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
                 
                 {/* Method 1: TOTP (Authenticator App) */}
                 {verificationMethod === 'totp' && (
-                  <div>
+                  <div className="space-y-2 text-center">
                     <label 
-                      htmlFor="totp_login_code"
-                      className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1"
+                      className="block text-xs font-bold text-slate-800 dark:text-slate-200"
                     >
                       Enter 6-Digit Authenticator Code
                     </label>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-2">
-                      Open Google Authenticator or your TOTP app to view the code.
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center justify-center gap-1">
+                      <Clock className="h-3 w-3 text-indigo-500" />
+                      <span>Open Google Authenticator or your TOTP app</span>
                     </p>
-                    <input
-                      ref={codeInputRef}
-                      id="totp_login_code"
-                      type="text"
-                      inputMode="numeric"
-                      autoComplete="one-time-code"
-                      pattern="[0-9]*"
-                      maxLength={6}
-                      required
-                      value={twoFaCode}
-                      onChange={handleCodeChange}
-                      placeholder="000 000"
-                      className="w-full rounded-xl border border-indigo-300 bg-indigo-50/40 py-3 text-center text-2xl font-mono font-black tracking-[8px] text-slate-900 placeholder:text-slate-400 focus:border-indigo-600 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 dark:border-indigo-800 dark:bg-indigo-950/30 dark:text-white"
-                    />
+                    <div className="pt-2">
+                      <TwoFactorOtpInput
+                        value={twoFaCode}
+                        onChange={setTwoFaCode}
+                        onComplete={() => {}}
+                        accentColor="indigo"
+                        disabled={verifying2Fa}
+                        error={Boolean(errorMessage)}
+                      />
+                    </div>
                   </div>
                 )}
 
                 {/* Method 2: Email Code (Resend) */}
                 {verificationMethod === 'email' && (
-                  <div>
+                  <div className="space-y-2 text-center">
                     <label 
-                      htmlFor="email_login_code"
-                      className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1"
+                      className="block text-xs font-bold text-slate-800 dark:text-slate-200"
                     >
                       Enter 6-Digit Email Code
                     </label>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-2">
-                      Sent to <strong className="text-slate-700 dark:text-slate-300">{pendingUser.email}</strong> via Resend.
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                      A sign-in verification code was sent to your email.
                     </p>
-                    <input
-                      ref={codeInputRef}
-                      id="email_login_code"
-                      type="text"
-                      inputMode="numeric"
-                      autoComplete="one-time-code"
-                      pattern="[0-9]*"
-                      maxLength={6}
-                      required
-                      value={twoFaCode}
-                      onChange={handleCodeChange}
-                      placeholder="000 000"
-                      className="w-full rounded-xl border border-blue-300 bg-blue-50/40 py-3 text-center text-2xl font-mono font-black tracking-[8px] text-slate-900 placeholder:text-slate-400 focus:border-blue-600 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 dark:border-blue-800 dark:bg-blue-950/30 dark:text-white"
-                    />
 
-                    <div className="mt-2 flex items-center justify-between text-[11px]">
+                    <div className="pt-2">
+                      <TwoFactorOtpInput
+                        value={twoFaCode}
+                        onChange={setTwoFaCode}
+                        onComplete={() => {}}
+                        accentColor="blue"
+                        disabled={verifying2Fa}
+                        error={Boolean(errorMessage)}
+                      />
+                    </div>
+
+                    <div className="mt-3 flex items-center justify-between text-[11px] pt-1 px-1">
                       <span className="text-slate-500 dark:text-slate-400">Didn't receive email?</span>
                       <button
                         type="button"
                         onClick={() => handleDispatchEmailCode()}
                         disabled={emailSending || emailCooldown > 0}
-                        className="font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 disabled:opacity-50 transition-colors cursor-pointer"
+                        className="font-bold text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 disabled:opacity-50 transition-colors cursor-pointer flex items-center gap-1"
                       >
-                        {emailSending
-                          ? 'Sending...'
-                          : emailCooldown > 0
-                          ? `Resend in ${emailCooldown}s`
-                          : 'Resend Code'}
+                        {emailSending ? (
+                          <>
+                            <RefreshCw className="h-3 w-3 animate-spin" />
+                            <span>Sending...</span>
+                          </>
+                        ) : emailCooldown > 0 ? (
+                          <span>Resend in {emailCooldown}s</span>
+                        ) : (
+                          <>
+                            <RefreshCw className="h-3 w-3" />
+                            <span>Resend Code</span>
+                          </>
+                        )}
                       </button>
                     </div>
                   </div>
@@ -535,7 +544,7 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
                 <button
                   type="submit"
                   disabled={verifying2Fa || !twoFaCode.trim()}
-                  className="mt-2 w-full inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 py-3 text-xs font-semibold text-white shadow-lg shadow-indigo-600/25 hover:bg-indigo-500 disabled:opacity-50 transition-all hover:scale-[1.01] cursor-pointer"
+                    className="ml-auto inline-flex items-center justify-center rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-indigo-600/20 transition-all hover:bg-indigo-700 active:scale-[0.98] disabled:opacity-50 cursor-pointer"
                 >
                   {verifying2Fa ? (
                     <>
@@ -544,7 +553,6 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
                     </>
                   ) : (
                     <>
-                      <ShieldCheck className="h-4 w-4" />
                       <span>Verify &amp; Enter Console</span>
                     </>
                   )}
@@ -585,14 +593,6 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
             </div>
           )}
 
-        </div>
-
-        {/* Security Footer Note */}
-        <p className="mt-6 text-center text-[11px] text-slate-400 dark:text-slate-500 flex items-center justify-center gap-1.5">
-          <ShieldCheck className="h-3.5 w-3.5 text-indigo-500" />
-          <span>Secured with Encrypted Session &amp; Multi-Factor Access Control</span>
-        </p>
-      </div>
-    </div>
+    </AdminAuthLayout>
   );
 };

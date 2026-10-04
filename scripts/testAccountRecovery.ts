@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
 import dotenv from 'dotenv';
-import { buildPasswordResetHtml, sendPasswordResetEmail } from '../src/server/resendEmailService.ts';
+import { buildPasswordResetHtml, buildTwoFactorEmailHtml, sendPasswordResetEmail } from '../src/server/resendEmailService.ts';
 
 dotenv.config();
 
@@ -36,14 +36,41 @@ async function runRecoveryVerification() {
     fullName: 'Test Administrator',
     resetUrl: sampleUrl,
     otpCode: sampleOtp,
-    expiresMinutes: 30
+    expiresMinutes: 30,
+    sentAt: new Date('2026-10-03T12:00:00.000Z')
   });
 
-  if (!html.includes(sampleOtp) || !html.includes(sampleUrl) || !html.includes('inaquired')) {
+  if (
+    !html.includes(sampleOtp) ||
+    !html.includes('Admin account recovery') ||
+    !html.includes('Requested:') ||
+    !html.includes('Expires:') ||
+    !html.includes('Oct 3, 2026, 12:00 PM UTC') ||
+    html.includes(sampleUrl) ||
+    html.includes(TEST_EMAIL)
+  ) {
     throw new Error('Resend HTML template failed validation checks.');
   }
   console.log('  [PASS] Resend HTML email template generated successfully.');
-  console.log(`  [INFO] Template contains 6-digit OTP (${sampleOtp}) and reset button link.`);
+  console.log(`  [INFO] Recovery email identifies its purpose, includes UTC timing, and does not expose account/link details.`);
+
+  const twoFactorHtml = buildTwoFactorEmailHtml({
+    to: TEST_EMAIL,
+    otpCode: sampleOtp,
+    expiresMinutes: 10,
+    sentAt: new Date('2026-10-03T12:00:00.000Z')
+  });
+  if (
+    !twoFactorHtml.includes(sampleOtp) ||
+    !twoFactorHtml.includes('Admin sign-in verification') ||
+    !twoFactorHtml.includes('Requested:') ||
+    !twoFactorHtml.includes('Expires:') ||
+    !twoFactorHtml.includes('Oct 3, 2026, 12:00 PM UTC') ||
+    twoFactorHtml.includes(TEST_EMAIL)
+  ) {
+    throw new Error('2FA email template failed validation checks.');
+  }
+  console.log('  [PASS] 2FA email explains the sign-in purpose and includes UTC timing without account details.');
 
   // 2. Test sendPasswordResetEmail function
   console.log('\n2. Testing sendPasswordResetEmail() dispatcher...');

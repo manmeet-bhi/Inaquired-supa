@@ -22,7 +22,7 @@ async function createAdmin() {
   console.log(`Creating Admin user in Supabase Postgres...`);
   const client = new Client({
     connectionString: uri,
-    ssl: { rejectUnauthorized: true }
+    ssl: { rejectUnauthorized: false }
   });
   await client.connect();
 

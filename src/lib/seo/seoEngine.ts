@@ -483,7 +483,11 @@ export function renderServerHtmlHeadTags(meta: ServerMetadata): string {
 
   // 7. Structured Data / JSON-LD Scripts
   for (const schema of meta.jsonLd) {
-    tags.push(`<script type="application/ld+json">${JSON.stringify(schema)}</script>`);
+    const serializedSchema = JSON.stringify(schema)
+      .replace(/</g, '\\u003c')
+      .replace(/>/g, '\\u003e')
+      .replace(/&/g, '\\u0026');
+    tags.push(`<script type="application/ld+json">${serializedSchema}</script>`);
   }
 
   return tags.join('\n    ');

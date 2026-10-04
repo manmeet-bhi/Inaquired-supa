@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Layers, AlertCircle, Check, Link as LinkIcon, AlignLeft } from 'lucide-react';
+import { X, Layers, AlertCircle, Link as LinkIcon, AlignLeft } from 'lucide-react';
 import { Category } from '../../services/categoryService';
 
 interface CategoryModalProps {
@@ -187,10 +187,7 @@ export const CategoryModal: React.FC<CategoryModalProps> = ({
                   <span>Saving...</span>
                 </>
               ) : (
-                <>
-                  <Check className="h-4 w-4" />
-                  <span>{isEditing ? 'Save Changes' : 'Create Department'}</span>
-                </>
+                <span>{isEditing ? 'Save Changes' : 'Create Department'}</span>
               )}
             </button>
           </div>

@@ -3,7 +3,11 @@ import pg from 'pg';
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 import { sendTwoFactorEmail } from './resendEmailService.ts';
-import { sendJsonResponse, parseRequestBody } from './recoveryApiHandlers.ts';
+import {
+  sendJsonResponse,
+  parseRequestBody,
+  enforceAuthRateLimit
+} from './recoveryApiHandlers.ts';
 import { 
   generateBase32Secret, 
   formatSecret, 
@@ -15,102 +19,129 @@ import {
 
 dotenv.config();
 
-const { Client } = pg;
+const { Pool } = pg;
 
 // Supabase credentials
 const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseKey);
+const hasServiceRoleKey = Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY);
 
 // Direct DB connection string fallback - strictly from environment variables
 const directDbUri = process.env.SUPABASE_DIRECT_URL || '';
+const dbPool = directDbUri
+  ? new Pool({
+      connectionString: directDbUri,
+      ssl: { rejectUnauthorized: false },
+      max: 10,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 10000,
+    })
+  : null;
 
 /**
  * Execute RPC function via Supabase JS client or direct Postgres connection
  */
 async function callDbRpc(procedureName: string, params: Record<string, any>): Promise<any> {
-  // First attempt via Supabase RPC
-  try {
-    const { data, error } = await supabase.rpc(procedureName, params);
-    if (!error && data !== null) {
-      return data;
+  // First attempt via Supabase RPC (for anon-accessible functions or when service role key is present)
+  if (hasServiceRoleKey) {
+    try {
+      const { data, error } = await supabase.rpc(procedureName, params);
+      if (!error && data !== null) {
+        return data;
+      }
+      if (error && error.code !== '42501') {
+        console.warn(`[Supabase RPC Notice] ${procedureName}:`, error.message);
+      }
+    } catch (rpcErr: any) {
+      console.warn(`[Supabase RPC Exception] ${procedureName}:`, rpcErr.message);
     }
-    if (error) {
-      console.warn(`[Supabase RPC Notice] ${procedureName}:`, error.message);
-    }
-  } catch (rpcErr: any) {
-    console.warn(`[Supabase RPC Exception] ${procedureName}:`, rpcErr.message);
   }
 
-  // Fallback: Direct PostgreSQL Client
-  console.log(`[DB Fallback] Executing ${procedureName} via direct PostgreSQL connection...`);
-  const client = new Client({
-    connectionString: directDbUri,
-    ssl: { rejectUnauthorized: true },
-    connectionTimeoutMillis: 10000,
-  });
-
-  try {
-    await client.connect();
-
-    if (procedureName === 'admin_get_2fa_status') {
-      const { rows } = await client.query(
-        'SELECT public.admin_get_2fa_status($1) as res;',
-        [params.p_email]
-      );
-      return rows[0]?.res;
-    }
-
-    if (procedureName === 'admin_save_2fa_config') {
-      const { rows } = await client.query(
-        'SELECT public.admin_save_2fa_config($1, $2, $3, $4, $5) as res;',
-        [
-          params.p_email,
-          params.p_totp_secret,
-          params.p_totp_enabled,
-          params.p_email_enabled,
-          JSON.stringify(params.p_backup_codes || [])
-        ]
-      );
-      return rows[0]?.res;
-    }
-
-    if (procedureName === 'admin_store_email_2fa_otp') {
-      const { rows } = await client.query(
-        'SELECT public.admin_store_email_2fa_otp($1, $2, $3) as res;',
-        [params.p_email, params.p_otp_code, params.p_expires_minutes || 10]
-      );
-      return rows[0]?.res;
-    }
-
-    if (procedureName === 'admin_verify_email_2fa_otp') {
-      const { rows } = await client.query(
-        'SELECT public.admin_verify_email_2fa_otp($1, $2) as res;',
-        [params.p_email, params.p_otp_code]
-      );
-      return rows[0]?.res;
-    }
-
-    if (procedureName === 'admin_consume_backup_code') {
-      const { rows } = await client.query(
-        'SELECT public.admin_consume_backup_code($1, $2) as res;',
-        [params.p_email, params.p_code]
-      );
-      return rows[0]?.res;
-    }
-
-    if (procedureName === 'admin_disable_2fa') {
-      const { rows } = await client.query(
-        'SELECT public.admin_disable_2fa($1) as res;',
-        [params.p_email]
-      );
-      return rows[0]?.res;
-    }
-
-    throw new Error(`Unsupported 2FA fallback procedure: ${procedureName}`);
-  } finally {
-    try { await client.end(); } catch {}
+  // Direct PostgreSQL Client / Pool execution
+  if (!dbPool) {
+    throw new Error(`Database connection not configured for procedure ${procedureName}`);
   }
+
+  if (procedureName === 'admin_get_2fa_status') {
+    const { rows } = await dbPool.query(
+      'SELECT public.admin_get_2fa_status($1) as res;',
+      [params.p_email]
+    );
+    return rows[0]?.res;
+  }
+
+  if (procedureName === 'admin_mark_two_factor_session_verified') {
+    const { rows } = await dbPool.query(
+      'SELECT public.admin_mark_two_factor_session_verified($1, $2) as res;',
+      [params.p_session_id, params.p_user_id]
+    );
+    return rows[0]?.res;
+  }
+
+  if (procedureName === 'admin_is_two_factor_session_verified') {
+    const { rows } = await dbPool.query(
+      'SELECT public.admin_is_two_factor_session_verified($1, $2) as res;',
+      [params.p_session_id, params.p_user_id]
+    );
+    return rows[0]?.res;
+  }
+
+  if (procedureName === 'admin_save_2fa_config') {
+    const { rows } = await dbPool.query(
+      'SELECT public.admin_save_2fa_config($1, $2, $3, $4, $5) as res;',
+      [
+        params.p_email,
+        params.p_totp_secret,
+        params.p_totp_enabled,
+        params.p_email_enabled,
+        JSON.stringify(params.p_backup_codes || [])
+      ]
+    );
+    return rows[0]?.res;
+  }
+
+  if (procedureName === 'admin_store_email_2fa_otp') {
+    const { rows } = await dbPool.query(
+      'SELECT public.admin_store_email_2fa_otp($1, $2, $3) as res;',
+      [params.p_email, params.p_otp_code, params.p_expires_minutes || 10]
+    );
+    return rows[0]?.res;
+  }
+
+  if (procedureName === 'admin_verify_email_2fa_otp') {
+    const { rows } = await dbPool.query(
+      'SELECT public.admin_verify_email_2fa_otp($1, $2) as res;',
+      [params.p_email, params.p_otp_code]
+    );
+    return rows[0]?.res;
+  }
+
+  if (procedureName === 'admin_consume_backup_code') {
+    const { rows } = await dbPool.query(
+      'SELECT public.admin_consume_backup_code($1, $2) as res;',
+      [params.p_email, params.p_code]
+    );
+    return rows[0]?.res;
+  }
+
+  if (procedureName === 'admin_consume_auth_rate_limit') {
+    const { rows } = await dbPool.query(
+      'SELECT public.admin_consume_auth_rate_limit($1, $2, $3, $4) as res;',
+      [params.p_scope, params.p_identifier, params.p_limit, params.p_window_seconds]
+    );
+    return rows[0]?.res;
+  }
+
+  if (procedureName === 'admin_disable_2fa') {
+    const { rows } = await dbPool.query(
+      'SELECT public.admin_disable_2fa($1, $2) as res;',
+      [params.p_email, params.p_method || 'all']
+    );
+    return rows[0]?.res;
+  }
+
+  throw new Error(`Unsupported 2FA fallback procedure: ${procedureName}`);
 }
 
 /**
@@ -123,7 +154,7 @@ async function getAdminRecord(email: string) {
   try {
     const { data, error } = await supabase
       .from('admin_users')
-      .select('id, email, full_name, role, two_factor_enabled, totp_enabled, email_2fa_enabled, totp_secret, backup_codes')
+      .select('id, email, full_name, role, status, two_factor_enabled, totp_enabled, email_2fa_enabled, totp_secret, backup_codes')
       .eq('email', cleanEmail)
       .maybeSingle();
 
@@ -134,30 +165,55 @@ async function getAdminRecord(email: string) {
     console.warn('[Supabase getAdminRecord Notice]', err);
   }
 
-  // Fallback direct postgres
-  const client = new Client({
-    connectionString: directDbUri,
-    ssl: { rejectUnauthorized: true },
-    connectionTimeoutMillis: 10000,
-  });
-
-  try {
-    await client.connect();
-    const { rows } = await client.query(
-      `SELECT id, email, full_name, role, two_factor_enabled, totp_enabled, email_2fa_enabled, totp_secret, backup_codes
-       FROM public.admin_users WHERE LOWER(email) = $1 LIMIT 1;`,
-      [cleanEmail]
-    );
-    return rows[0] || null;
-  } finally {
-    try { await client.end(); } catch {}
+  // Fallback direct postgres via connection pool
+  if (dbPool) {
+    try {
+      const { rows } = await dbPool.query(
+        `SELECT id, email, full_name, role, status, two_factor_enabled, totp_enabled, email_2fa_enabled, totp_secret, backup_codes
+         FROM public.admin_users WHERE LOWER(email) = $1 LIMIT 1;`,
+        [cleanEmail]
+      );
+      return rows[0] || null;
+    } catch (err) {
+      console.error('[Direct DB getAdminRecord Error]', err);
+    }
   }
+  return null;
 }
 
 /**
  * Authenticates that the incoming request has a valid Supabase Bearer token matching the target user or superadmin
  */
-async function verifyRequestAdmin(req: any, targetEmail?: string): Promise<{ authorized: boolean; error?: string; user?: any }> {
+function getSessionIdFromAccessToken(token: string): string | null {
+  try {
+    const payloadSegment = token.split('.')[1];
+    if (!payloadSegment) return null;
+    const claims = JSON.parse(Buffer.from(payloadSegment, 'base64url').toString('utf8'));
+    const sessionId = claims.session_id;
+    return typeof sessionId === 'string'
+      && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sessionId)
+      ? sessionId
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+async function markTwoFactorSessionVerified(sessionId: string, userId: string): Promise<void> {
+  const result = await callDbRpc('admin_mark_two_factor_session_verified', {
+    p_session_id: sessionId,
+    p_user_id: userId,
+  });
+  if (!result) {
+    throw new Error('Unable to mark this session as two-factor verified.');
+  }
+}
+
+async function verifyRequestAdmin(
+  req: any,
+  targetEmail?: string,
+  requireRecentTwoFactor = false
+): Promise<{ authorized: boolean; error?: string; user?: any }> {
   const authHeader = req.headers?.authorization || req.headers?.Authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return { authorized: false, error: 'Unauthorized. Authorization Bearer token required.' };
@@ -170,9 +226,26 @@ async function verifyRequestAdmin(req: any, targetEmail?: string): Promise<{ aut
       return { authorized: false, error: 'Invalid or expired authentication session.' };
     }
 
+    const sessionId = getSessionIdFromAccessToken(token);
+    if (!sessionId) {
+      return { authorized: false, error: 'Invalid authentication session claims.' };
+    }
+
     const adminRecord = await getAdminRecord(user.email || '');
-    if (!adminRecord || adminRecord.id !== user.id || adminRecord.status !== 'active') {
+    const isActive = adminRecord && (adminRecord.status === 'active' || !adminRecord.status);
+    if (!adminRecord || adminRecord.id !== user.id || !isActive) {
       return { authorized: false, error: 'An active administrator account is required.' };
+    }
+
+    if (
+      requireRecentTwoFactor
+      && adminRecord.two_factor_enabled
+      && !await callDbRpc('admin_is_two_factor_session_verified', {
+        p_session_id: sessionId,
+        p_user_id: user.id,
+      })
+    ) {
+      return { authorized: false, error: 'Complete two-factor verification to manage this account.' };
     }
 
     if (targetEmail && user.email?.toLowerCase() !== targetEmail.toLowerCase()) {
@@ -181,7 +254,7 @@ async function verifyRequestAdmin(req: any, targetEmail?: string): Promise<{ aut
       }
     }
 
-    return { authorized: true, user };
+    return { authorized: true, user: { ...user, sessionId } };
   } catch (err: any) {
     return { authorized: false, error: err.message || 'Authentication error.' };
   }
@@ -246,12 +319,16 @@ export async function handleGenerateTotpSetup(req: any, res: any) {
       });
     }
 
-    const authCheck = await verifyRequestAdmin(req, email);
+    const authCheck = await verifyRequestAdmin(req, email, true);
     if (!authCheck.authorized) {
       return sendJsonResponse(res, 401, {
         success: false,
         error: authCheck.error || 'Authentication required to setup 2FA.'
       });
+    }
+
+    if (!await enforceAuthRateLimit(req, res, '2fa-setup-totp', email, 10, 15 * 60, 60)) {
+      return;
     }
 
     // Generate fresh high-entropy Base32 secret (32 Base32 characters)
@@ -294,12 +371,16 @@ export async function handleVerifyTotpSetup(req: any, res: any) {
       });
     }
 
-    const authCheck = await verifyRequestAdmin(req, email);
+    const authCheck = await verifyRequestAdmin(req, email, true);
     if (!authCheck.authorized) {
       return sendJsonResponse(res, 401, {
         success: false,
         error: authCheck.error || 'Authentication required to activate 2FA.'
       });
+    }
+
+    if (!await enforceAuthRateLimit(req, res, '2fa-setup-totp', email, 10, 15 * 60, 60)) {
+      return;
     }
 
     // Verify 6-digit code with ±1 time step tolerance (30 seconds)
@@ -339,6 +420,8 @@ export async function handleVerifyTotpSetup(req: any, res: any) {
       });
     }
 
+    await markTwoFactorSessionVerified(authCheck.user.sessionId, authCheck.user.id);
+
     return sendJsonResponse(res, 200, {
       success: true,
       message: 'Google Authenticator 2FA enabled successfully!',
@@ -370,9 +453,16 @@ export async function handleSendEmail2FaCode(req: any, res: any) {
       });
     }
 
+    if (!await enforceAuthRateLimit(req, res, '2fa-email-code-send', email, 3, 60 * 60, 20)) {
+      return;
+    }
+
     const authCheck = await verifyRequestAdmin(req, email);
     if (!authCheck.authorized) {
-      return sendJsonResponse(res, 401, { success: false, error: authCheck.error });
+      return sendJsonResponse(res, 401, {
+        success: false,
+        error: authCheck.error || 'Unauthorized. Valid administrator account required.'
+      });
     }
 
     // Generate cryptographically secure 6-digit OTP
@@ -400,13 +490,17 @@ export async function handleSendEmail2FaCode(req: any, res: any) {
       expiresMinutes: 10
     });
 
-    const isDev = process.env.NODE_ENV === 'development';
+    if (!sendResult.success || sendResult.mode !== 'resend_live') {
+      return sendJsonResponse(res, 503, {
+        success: false,
+        error: 'Email delivery is not available. Please try again later.'
+      });
+    }
+
     return sendJsonResponse(res, 200, {
       success: true,
       message: `A 6-digit security code has been sent to ${email}.`,
-      expiresMinutes: 10,
-      mode: sendResult.mode,
-      devOtp: isDev && sendResult.mode === 'dev_fallback' ? sendResult.devOtp : undefined
+      expiresMinutes: 10
     });
   } catch (err: any) {
     console.error('[Send Email 2FA Error]', err);
@@ -434,12 +528,16 @@ export async function handleVerifyEmail2FaSetup(req: any, res: any) {
       });
     }
 
-    const authCheck = await verifyRequestAdmin(req, email);
+    const authCheck = await verifyRequestAdmin(req, email, true);
     if (!authCheck.authorized) {
       return sendJsonResponse(res, 401, {
         success: false,
         error: authCheck.error || 'Authentication required to activate 2FA.'
       });
+    }
+
+    if (!await enforceAuthRateLimit(req, res, '2fa-setup-email', email, 5, 15 * 60, 60)) {
+      return;
     }
 
     // Verify OTP in DB
@@ -467,13 +565,22 @@ export async function handleVerifyEmail2FaSetup(req: any, res: any) {
     }
 
     // Save in database
-    await callDbRpc('admin_save_2fa_config', {
+    const saveResult = await callDbRpc('admin_save_2fa_config', {
       p_email: email,
       p_totp_secret: null,
       p_totp_enabled: userRecord?.totp_enabled || false,
       p_email_enabled: true,
       p_backup_codes: backupCodes
     });
+
+    if (!saveResult?.success) {
+      return sendJsonResponse(res, 500, {
+        success: false,
+        error: saveResult?.error || 'Failed to save 2FA configuration.'
+      });
+    }
+
+    await markTwoFactorSessionVerified(authCheck.user.sessionId, authCheck.user.id);
 
     return sendJsonResponse(res, 200, {
       success: true,
@@ -508,9 +615,13 @@ export async function handleVerifyLogin2Fa(req: any, res: any) {
       });
     }
 
+    if (!await enforceAuthRateLimit(req, res, '2fa-login', email, 5, 15 * 60, 50)) {
+      return;
+    }
+
     const authCheck = await verifyRequestAdmin(req, email);
     if (!authCheck.authorized) {
-      return sendJsonResponse(res, 401, { success: false, error: authCheck.error });
+      return sendJsonResponse(res, 401, { success: false, error: authCheck.error || 'Unauthorized.' });
     }
 
     const userRecord = await getAdminRecord(email);
@@ -539,6 +650,8 @@ export async function handleVerifyLogin2Fa(req: any, res: any) {
         });
       }
 
+      await markTwoFactorSessionVerified(authCheck.user.sessionId, userRecord.id);
+
       return sendJsonResponse(res, 200, {
         success: true,
         message: 'Authenticator verified successfully.',
@@ -565,6 +678,8 @@ export async function handleVerifyLogin2Fa(req: any, res: any) {
         });
       }
 
+      await markTwoFactorSessionVerified(authCheck.user.sessionId, userRecord.id);
+
       return sendJsonResponse(res, 200, {
         success: true,
         message: 'Email security code verified successfully.',
@@ -590,6 +705,8 @@ export async function handleVerifyLogin2Fa(req: any, res: any) {
           error: backupResult?.error || 'Invalid or already used backup code.'
         });
       }
+
+      await markTwoFactorSessionVerified(authCheck.user.sessionId, userRecord.id);
 
       return sendJsonResponse(res, 200, {
         success: true,
@@ -633,7 +750,7 @@ export async function handleRegenerateBackupCodes(req: any, res: any) {
       });
     }
 
-    const authCheck = await verifyRequestAdmin(req, email);
+    const authCheck = await verifyRequestAdmin(req, email, true);
     if (!authCheck.authorized) {
       return sendJsonResponse(res, 401, {
         success: false,
@@ -643,29 +760,25 @@ export async function handleRegenerateBackupCodes(req: any, res: any) {
 
     const newCodes = generateBackupCodes(10);
 
-    const client = new Client({
-      connectionString: directDbUri,
-      ssl: { rejectUnauthorized: true },
-      connectionTimeoutMillis: 10000,
-    });
+    if (!dbPool) {
+      return sendJsonResponse(res, 500, {
+        success: false,
+        error: 'Database connection not available.'
+      });
+    }
 
-    try {
-      await client.connect();
-      const { rowCount } = await client.query(
-        `UPDATE public.admin_users 
-         SET backup_codes = $1, updated_at = NOW() 
-         WHERE LOWER(email) = $2;`,
-        [JSON.stringify(newCodes), email]
-      );
+    const { rowCount } = await dbPool.query(
+      `UPDATE public.admin_users
+       SET backup_codes = $1, updated_at = NOW()
+       WHERE LOWER(email) = $2;`,
+      [JSON.stringify(newCodes), email]
+    );
 
-      if (rowCount === 0) {
-        return sendJsonResponse(res, 404, {
-          success: false,
-          error: 'Admin user not found.'
-        });
-      }
-    } finally {
-      try { await client.end(); } catch {}
+    if (rowCount === 0) {
+      return sendJsonResponse(res, 404, {
+        success: false,
+        error: 'Admin user not found.'
+      });
     }
 
     return sendJsonResponse(res, 200, {
@@ -698,7 +811,7 @@ export async function handleGetBackupCodes(req: any, res: any) {
       });
     }
 
-    const authCheck = await verifyRequestAdmin(req, email);
+    const authCheck = await verifyRequestAdmin(req, email, true);
     if (!authCheck.authorized) {
       return sendJsonResponse(res, 401, {
         success: false,
@@ -745,7 +858,7 @@ export async function handleDisable2Fa(req: any, res: any) {
       });
     }
 
-    const authCheck = await verifyRequestAdmin(req, email);
+    const authCheck = await verifyRequestAdmin(req, email, true);
     if (!authCheck.authorized) {
       return sendJsonResponse(res, 401, {
         success: false,
@@ -753,50 +866,16 @@ export async function handleDisable2Fa(req: any, res: any) {
       });
     }
 
-    const client = new Client({
-      connectionString: directDbUri,
-      ssl: { rejectUnauthorized: true },
-      connectionTimeoutMillis: 10000,
+    const result = await callDbRpc('admin_disable_2fa', {
+      p_email: email,
+      p_method: method || 'all'
     });
 
-    try {
-      await client.connect();
-
-      if (method === 'totp') {
-        await client.query(
-          `UPDATE public.admin_users
-           SET totp_enabled = false,
-               two_factor_enabled = (email_2fa_enabled = true),
-               updated_at = NOW()
-           WHERE LOWER(email) = $1;`,
-          [email]
-        );
-      } else if (method === 'email') {
-        await client.query(
-          `UPDATE public.admin_users
-           SET email_2fa_enabled = false,
-               temp_email_otp = NULL,
-               temp_email_otp_expires = NULL,
-               two_factor_enabled = (totp_enabled = true),
-               updated_at = NOW()
-           WHERE LOWER(email) = $1;`,
-          [email]
-        );
-      } else {
-        await client.query(
-          `UPDATE public.admin_users
-           SET two_factor_enabled = false,
-               totp_enabled = false,
-               email_2fa_enabled = false,
-               temp_email_otp = NULL,
-               temp_email_otp_expires = NULL,
-               updated_at = NOW()
-           WHERE LOWER(email) = $1;`,
-          [email]
-        );
-      }
-    } finally {
-      try { await client.end(); } catch {}
+    if (!result?.success) {
+      return sendJsonResponse(res, 500, {
+        success: false,
+        error: result?.error || 'Failed to update 2FA configuration.'
+      });
     }
 
     return sendJsonResponse(res, 200, {

@@ -159,10 +159,7 @@ export const UserEditorPage: React.FC<UserEditorPageProps> = ({
                   <span>Saving...</span>
                 </>
               ) : (
-                <>
-                  <Check className="h-4 w-4" />
-                  <span>{isEditing ? 'Save Changes' : 'Create User'}</span>
-                </>
+                <span>{isEditing ? 'Save Changes' : 'Create User'}</span>
               )}
             </button>
           </div>

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
+  Briefcase,
   X, 
   Plus, 
   Building, 
@@ -111,6 +112,7 @@ export const JobFormModal: React.FC<JobFormModalProps> = ({
       setApplicationUrl(initialJob.applicationUrl || '');
       setApplicationDeadline(initialJob.applicationDeadline || '');
       setTags(initialJob.tags || []);
+      setCurrentTagInput('');
       setStatus(initialJob.status || 'published');
       setFeatured(Boolean(initialJob.featured));
     } else {
@@ -156,13 +158,25 @@ export const JobFormModal: React.FC<JobFormModalProps> = ({
     setFeatured(false);
   };
 
+  const addTags = (tagsToAdd: string[]) => {
+    setTags((currentTags) => {
+      const knownTags = new Set(currentTags.map((tag) => tag.toLocaleLowerCase()));
+      const newTags = tagsToAdd
+        .map((tag) => tag.trim())
+        .filter((tag) => {
+          const normalizedTag = tag.toLocaleLowerCase();
+          if (!normalizedTag || knownTags.has(normalizedTag)) return false;
+          knownTags.add(normalizedTag);
+          return true;
+        });
+      return [...currentTags, ...newTags];
+    });
+  };
+
   const handleAddTag = (tagToAdd?: string) => {
-    const raw = tagToAdd || currentTagInput;
-    const trimmed = raw.trim();
-    if (trimmed && !tags.includes(trimmed)) {
-      setTags([...tags, trimmed]);
-      if (!tagToAdd) setCurrentTagInput('');
-    }
+    const raw = tagToAdd ?? currentTagInput;
+    addTags(raw.split(','));
+    if (tagToAdd === undefined) setCurrentTagInput('');
   };
 
   const handleRemoveTag = (tagToRemove: string) => {
@@ -175,6 +189,15 @@ export const JobFormModal: React.FC<JobFormModalProps> = ({
       handleAddTag();
     }
   };
+
+  const tagSearchQuery = currentTagInput.split(',').pop()?.trim() || '';
+  const hasMinimumTagSearchLength = tagSearchQuery.replace(/[^a-z]/gi, '').length >= 3;
+  const matchingTagSuggestions = hasMinimumTagSearchLength
+    ? QUICK_TAG_SUGGESTIONS.filter((suggestion) =>
+        suggestion.toLocaleLowerCase().includes(tagSearchQuery.toLocaleLowerCase()) &&
+        !tags.some((tag) => tag.toLocaleLowerCase() === suggestion.toLocaleLowerCase())
+      )
+    : [];
 
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -339,7 +362,7 @@ export const JobFormModal: React.FC<JobFormModalProps> = ({
                     Job Title <span className="text-rose-500">*</span>
                   </label>
                   <div className="relative">
-                    <JobIcon className="absolute left-3.5 top-2.5 h-4 w-4 text-slate-400" />
+                    <Briefcase aria-hidden="true" className="absolute left-3.5 top-2.5 h-4 w-4 text-slate-400" />
                     <input
                       type="text"
                       required
@@ -616,7 +639,8 @@ export const JobFormModal: React.FC<JobFormModalProps> = ({
                       value={currentTagInput}
                       onChange={(e) => setCurrentTagInput(e.target.value)}
                       onKeyDown={handleTagKeyDown}
-                      placeholder="Type skill & press Enter (e.g. React, Docker)"
+                      aria-label="Search or add skills and tags"
+                      placeholder="Search skills (3+ letters) or add comma-separated tags"
                       className="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-2 pl-8 pr-3 text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-indigo-500 focus:outline-none dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-100"
                     />
                   </div>
@@ -625,25 +649,42 @@ export const JobFormModal: React.FC<JobFormModalProps> = ({
                     onClick={() => handleAddTag()}
                     className="inline-flex items-center gap-1 rounded-xl bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer"
                   >
-                    <Plus className="h-3.5 w-3.5" />
                     <span>Add</span>
                   </button>
                 </div>
 
-                {/* Quick Suggestion Pills */}
-                <div className="flex flex-wrap gap-1.5 items-center pb-2">
-                  <span className="text-[11px] text-slate-400 mr-1">Quick add:</span>
-                  {QUICK_TAG_SUGGESTIONS.filter(t => !tags.includes(t)).slice(0, 6).map((suggested) => (
-                    <button
-                      key={suggested}
-                      type="button"
-                      onClick={() => handleAddTag(suggested)}
-                      className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-indigo-950 dark:hover:text-indigo-300 transition-colors cursor-pointer"
-                    >
-                      + {suggested}
-                    </button>
-                  ))}
-                </div>
+                {hasMinimumTagSearchLength ? (
+                  <div className="flex flex-wrap gap-1.5 items-center pb-2" aria-live="polite">
+                    {matchingTagSuggestions.length > 0 ? (
+                      matchingTagSuggestions.map((suggested) => (
+                        <button
+                          key={suggested}
+                          type="button"
+                          onClick={() => handleAddTag(suggested)}
+                          className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-indigo-950 dark:hover:text-indigo-300 transition-colors cursor-pointer"
+                        >
+                          + {suggested}
+                        </button>
+                      ))
+                    ) : (
+                      <span className="text-[10px] text-slate-400">No matches. Press Add or Enter to save this skill.</span>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap gap-1.5 items-center pb-2">
+                    <span className="text-[11px] text-slate-400 mr-1">Quick add:</span>
+                    {QUICK_TAG_SUGGESTIONS.filter(t => !tags.some(tag => tag.toLocaleLowerCase() === t.toLocaleLowerCase())).slice(0, 6).map((suggested) => (
+                      <button
+                        key={suggested}
+                        type="button"
+                        onClick={() => handleAddTag(suggested)}
+                        className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-indigo-950 dark:hover:text-indigo-300 transition-colors cursor-pointer"
+                      >
+                        + {suggested}
+                      </button>
+                    ))}
+                  </div>
+                )}
 
                 {tags.length > 0 && (
                   <div className="flex flex-wrap gap-1.5 pt-1">
@@ -750,7 +791,6 @@ export const JobFormModal: React.FC<JobFormModalProps> = ({
                 }}
                 className="inline-flex items-center gap-1 rounded-xl border border-slate-200 px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800 transition-colors cursor-pointer"
               >
-                <ArrowLeft className="h-3.5 w-3.5" />
                 <span>Back</span>
               </button>
             )}
@@ -773,7 +813,6 @@ export const JobFormModal: React.FC<JobFormModalProps> = ({
                 className="inline-flex items-center gap-1 rounded-xl bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 transition-all cursor-pointer"
               >
                 <span>Next</span>
-                <ArrowRight className="h-3.5 w-3.5" />
               </button>
             ) : null}
 
@@ -789,10 +828,7 @@ export const JobFormModal: React.FC<JobFormModalProps> = ({
                   <span>Saving...</span>
                 </>
               ) : (
-                <>
-                  <Check className="h-3.5 w-3.5" />
-                  <span>{isEditing ? 'Save Changes' : 'Post Job'}</span>
-                </>
+                <span>{isEditing ? 'Save Changes' : 'Post Job'}</span>
               )}
             </button>
           </div>

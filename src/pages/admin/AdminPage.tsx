@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Building, 
-  MapPin, 
-  Plus, 
+  MapPin,
   Search, 
   Trash2, 
   Edit3, 
@@ -30,10 +29,10 @@ import {
   X,
   Copy,
   FolderTree,
+  FolderOpen,
   ShieldCheck,
   CheckCircle,
   Users,
-  UserPlus,
   ShieldAlert,
   Shield,
   KeyRound,
@@ -348,9 +347,24 @@ export function parseAdminPath(pathname: string): AdminRouteState {
   };
 }
 
+const ADMIN_LAST_PATH_KEY = 'admin_last_dashboard_path';
+
+function getRememberedAdminPath(): string | null {
+  if (typeof window === 'undefined') return null;
+
+  try {
+    const path = window.sessionStorage.getItem(ADMIN_LAST_PATH_KEY);
+    if (!path || !path.startsWith('/admin/')) return null;
+    if (path.startsWith('/admin/forgot-password') || path.startsWith('/admin/reset-password')) return null;
+    return path;
+  } catch {
+    return null;
+  }
+}
+
 interface ResendAccountMenuProps {
   adminUser: AdminSessionUser;
-  onNavigateProfile: (section: 'profile' | 'security' | 'two_factor') => void;
+  onNavigateProfile: (section: 'profile' | 'security') => void;
   onNavigateHome: () => void;
   onSignOut: () => void;
   className?: string;
@@ -393,16 +407,6 @@ const ResendAccountMenu: React.FC<ResendAccountMenuProps> = ({
         Security &amp; Password
       </button>
 
-      {/* Menu Option: Two-Factor Auth (2FA) */}
-      <button
-        type="button"
-        onClick={() => onNavigateProfile('two_factor')}
-        className="w-full flex items-center justify-between px-3 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors cursor-pointer font-normal text-left"
-      >
-        <span>Two-Factor Auth (2FA)</span>
-        <span className="inline-flex h-2 w-2 rounded-full bg-emerald-500 ring-2 ring-emerald-500/20" />
-      </button>
-
       {/* Divider */}
       <div className="border-t border-slate-100 dark:border-slate-800/80 my-1" />
 
@@ -437,11 +441,16 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
   // Authentication State
   const [adminUser, setAdminUser] = useState<AdminSessionUser | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [authLoadingMessage, setAuthLoadingMessage] = useState('Checking your session...');
 
   // Initial Route parsed from clean URL
   const initialRoute = useMemo(() => {
     if (typeof window !== 'undefined') {
-      return parseAdminPath(window.location.pathname + window.location.search);
+      const currentPath = window.location.pathname + window.location.search;
+      const isAdminLanding = window.location.pathname.replace(/\/+$/, '') === '/admin';
+      return parseAdminPath(
+        isAdminLanding ? getRememberedAdminPath() || currentPath : currentPath
+      );
     }
     return {
       tab: 'home' as AdminTab,
@@ -471,6 +480,21 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
   const [editingUserId, setEditingUserId] = useState<string | null>(initialRoute.editingUserId);
   const [editingUser, setEditingUser] = useState<ManagedUser | null>(null);
 
+  useEffect(() => {
+    const { pathname, search } = window.location;
+    if (!pathname.startsWith('/admin/') ||
+      pathname.startsWith('/admin/forgot-password') ||
+      pathname.startsWith('/admin/reset-password')) {
+      return;
+    }
+
+    try {
+      window.sessionStorage.setItem(ADMIN_LAST_PATH_KEY, pathname + search);
+    } catch {
+      // The URL remains the source of truth when session storage is unavailable.
+    }
+  }, []);
+
   const navigateToAdminPath = (path: string, push: boolean = true) => {
     if (typeof window !== 'undefined') {
       const currentFull = window.location.pathname + window.location.search;
@@ -478,6 +502,13 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
         window.history.pushState(null, '', path);
       } else if (!push) {
         window.history.replaceState(null, '', path);
+      }
+      if (path.startsWith('/admin/') && !path.startsWith('/admin/forgot-password') && !path.startsWith('/admin/reset-password')) {
+        try {
+          window.sessionStorage.setItem(ADMIN_LAST_PATH_KEY, path);
+        } catch {
+          // The URL remains the source of truth when session storage is unavailable.
+        }
       }
     }
     const parsed = parseAdminPath(path);
@@ -511,7 +542,8 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
   useEffect(() => {
     const handlePopState = () => {
       if (typeof window !== 'undefined') {
-        const parsed = parseAdminPath(window.location.pathname + window.location.search);
+        const currentPath = window.location.pathname + window.location.search;
+        const parsed = parseAdminPath(currentPath);
         setActiveTab(parsed.tab);
         if (parsed.statusFilter !== undefined) {
           setStatusFilter(parsed.statusFilter);
@@ -522,6 +554,15 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
         setEditingCategoryId(parsed.editingCategoryId);
         setIsUserEditorOpen(parsed.isUserEditorOpen);
         setEditingUserId(parsed.editingUserId);
+        if (window.location.pathname.startsWith('/admin/') &&
+          !window.location.pathname.startsWith('/admin/forgot-password') &&
+          !window.location.pathname.startsWith('/admin/reset-password')) {
+          try {
+            window.sessionStorage.setItem(ADMIN_LAST_PATH_KEY, currentPath);
+          } catch {
+            // The URL remains the source of truth when session storage is unavailable.
+          }
+        }
       }
     };
     window.addEventListener('popstate', handlePopState);
@@ -757,15 +798,22 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
 
   // Handle Admin Sign Out
   const handleSignOut = async () => {
+    setAuthLoadingMessage('Signing you out...');
+    setAuthLoading(true);
     try {
       if (typeof window !== 'undefined') {
         sessionStorage.removeItem('2fa_verified_email');
         sessionStorage.removeItem('2fa_pending_email');
+        sessionStorage.removeItem(ADMIN_LAST_PATH_KEY);
       }
     } catch (e) {}
-    await signOutAdmin();
-    setAdminUser(null);
-    showToast('Signed out of Supabase Admin Console.');
+    try {
+      await signOutAdmin();
+    } finally {
+      setAdminUser(null);
+      setAuthLoading(false);
+      showToast('Signed out of Supabase Admin Console.');
+    }
   };
 
   // Test Supabase connection
@@ -950,9 +998,16 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
   const handleJobFormSubmit = async (jobData: Omit<Job, 'id'>, jobId?: string) => {
     if (jobId) {
       await updateJob(jobId, jobData);
+      setJobs((currentJobs) =>
+        currentJobs.map((job) => job.id === jobId ? { ...job, ...jobData, id: jobId } : job)
+      );
       showToast(`Updated "${jobData.title}" in Supabase.`);
     } else {
-      await createJob(jobData);
+      const createdJobId = await createJob(jobData);
+      setJobs((currentJobs) => [
+        { ...jobData, id: createdJobId },
+        ...currentJobs.filter((job) => job.id !== createdJobId),
+      ]);
       showToast(`Published "${jobData.title}" live to Supabase.`);
     }
     navigateToAdminPath('/admin/jobs');
@@ -1110,12 +1165,48 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
     profile: { title: 'Account Settings', description: 'Manage your profile and account security.' },
   };
 
+  useEffect(() => {
+    if (!adminUser) {
+      document.title = 'Admin Sign In | inaquired';
+      return;
+    }
+
+    let title = adminHeaderContent[activeTab].title;
+    if (isJobEditorOpen) {
+      title = editingJob
+        ? `Edit Listing: ${editingJob.title}`
+        : 'Create Job Listing';
+    } else if (isCategoryEditorOpen) {
+      title = editingCategory
+        ? `Edit Department: ${editingCategory.name}`
+        : 'Create Department';
+    } else if (isUserEditorOpen) {
+      title = editingUser
+        ? `Edit User: ${editingUser.fullName || editingUser.email}`
+        : 'Add Administrator';
+    } else if (activeTab === 'jobs' && statusFilter !== 'all') {
+      title = statusFilter === 'draft' ? 'Draft Listings' : 'Archived Listings';
+    }
+
+    document.title = `${title} | Admin Console | inaquired`;
+  }, [
+    activeTab,
+    adminUser,
+    isJobEditorOpen,
+    editingJob,
+    isCategoryEditorOpen,
+    editingCategory,
+    isUserEditorOpen,
+    editingUser,
+    statusFilter,
+  ]);
+
   if (authLoading) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
+      <div role="status" aria-live="polite" className="min-h-screen flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
         <span className="h-9 w-9 animate-spin rounded-full border-3 border-indigo-600 border-t-transparent dark:border-indigo-400" />
         <p className="mt-4 text-xs font-semibold text-slate-500 dark:text-slate-400">
-          Authenticating...
+          {authLoadingMessage}
         </p>
       </div>
     );
@@ -1127,7 +1218,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
         onLoginSuccess={(user) => {
           setAdminUser(user);
           showToast(`Welcome back, ${user.email}`);
-          navigateToAdminPath('/admin/home', false);
+          navigateToAdminPath(getRememberedAdminPath() || '/admin/home', false);
         }}
         onNavigate={onNavigate}
       />
@@ -1238,7 +1329,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
             {isProfileDropdownOpen && (
               <ResendAccountMenu
                 adminUser={adminUser}
-                onNavigateProfile={(section) => {
+                onNavigateProfile={(section: 'profile' | 'security') => {
                   setProfileSection(section);
                   changeTab('profile');
                   setIsProfileDropdownOpen(false);
@@ -1247,7 +1338,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
                 onNavigateHome={() => {
                   setIsProfileDropdownOpen(false);
                   setIsMobileMenuOpen(false);
-                  onNavigate('/');
+                  window.open('/', '_blank', 'noopener,noreferrer');
                 }}
                 onSignOut={() => {
                   setIsProfileDropdownOpen(false);
@@ -1314,7 +1405,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
               } ${isSidebarCollapsed ? 'justify-center' : ''}`}
               title="Manage Listings"
             >
-              <JobIcon className="h-4 w-4 shrink-0" />
+              <FolderOpen className="h-4 w-4 shrink-0" />
               {!isSidebarCollapsed && (
                 <div className="flex flex-1 items-center justify-between text-left truncate">
                   <span>Listings</span>
@@ -1433,9 +1524,8 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
                   {activeTab === 'jobs' && (
                     <button
                       onClick={() => navigateToAdminPath('/admin/add-new-job')}
-                      className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-indigo-500 transition-all cursor-pointer"
+                      className="inline-flex items-center rounded-xl bg-indigo-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-indigo-500 transition-all cursor-pointer"
                     >
-                      <Plus className="h-3.5 w-3.5" />
                       <span>Post Job</span>
                     </button>
                   )}
@@ -1445,18 +1535,16 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
                         setEditingCategory(null);
                         setIsCategoryEditorOpen(true);
                       }}
-                      className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-indigo-500 transition-all cursor-pointer"
+                      className="inline-flex items-center rounded-xl bg-indigo-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-indigo-500 transition-all cursor-pointer"
                     >
-                      <Plus className="h-3.5 w-3.5" />
                       <span>New Department</span>
                     </button>
                   )}
                   {activeTab === 'users' && (
                     <button
                       onClick={() => navigateToAdminPath('/admin/add-new-user')}
-                      className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-indigo-500 transition-all cursor-pointer"
+                      className="inline-flex items-center rounded-xl bg-indigo-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-indigo-500 transition-all cursor-pointer"
                     >
-                      <UserPlus className="h-3.5 w-3.5" />
                       <span>Add User</span>
                     </button>
                   )}
@@ -1666,9 +1754,8 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
                     </p>
                     <button
                       onClick={() => navigateToAdminPath('/admin/add-new-job')}
-                      className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-500"
+                      className="mt-4 inline-flex items-center rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-500"
                     >
-                      <Plus className="h-4 w-4" />
                       <span>Post Job</span>
                     </button>
                   </div>
@@ -1868,9 +1955,8 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
                     </p>
                     <button
                       onClick={() => navigateToAdminPath('/admin/add-new-department')}
-                      className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-500 cursor-pointer"
+                      className="mt-4 inline-flex items-center rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-500 cursor-pointer"
                     >
-                      <Plus className="h-4 w-4" />
                       <span>Add Department</span>
                     </button>
                   </div>
@@ -2083,9 +2169,8 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
                     </p>
                     <button
                       onClick={() => navigateToAdminPath('/admin/add-new-user')}
-                      className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-500 cursor-pointer"
+                      className="mt-4 inline-flex items-center rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-500 cursor-pointer"
                     >
-                      <UserPlus className="h-4 w-4" />
                       <span>Add User</span>
                     </button>
                   </div>

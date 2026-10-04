@@ -1,10 +1,17 @@
 [build]
   publish = "dist"
   command = "npm run build"
+  functions = "netlify/functions"
 
 [build.environment]
   SECRETS_SCAN_OMIT_PATHS = "dist/**"
   SECRETS_SCAN_OMIT_KEYS = "VITE_SUPABASE_ANON_KEY,VITE_SUPABASE_URL,VITE_SUPABASE_STORAGE_URL,VITE_SUPABASE_STORAGE_BUCKET,VITE_SUPABASE_STORAGE_REGION,RESEND_FROM_EMAIL,RESEND_API_KEY,SUPABASE_DIRECT_URL"
+
+# Route API requests to Netlify serverless functions
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/api/:splat"
+  status = 200
 
 # Handle client-side routing for Single Page Applications (SPA)
 [[redirects]]

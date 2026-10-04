@@ -8,8 +8,6 @@ import {
   AlertCircle, 
   Save, 
   KeyRound, 
-  Copy, 
-  Check, 
   RefreshCw,
   Sparkles,
   BadgeCheck,
@@ -21,27 +19,6 @@ import { AdminSessionUser, updateAdminProfile } from '../../services/adminAuthSe
 import { AdminTwoFactorSettings } from './AdminTwoFactorSettings';
 
 export type ProfileViewSection = 'profile' | 'security' | 'two_factor';
-
-/**
- * Generates a strictly alphanumeric ID formatted as:
- * - 4 starting alphabetical letters of the admin's name (uppercase)
- * - Followed by 4 digits/alphanumeric characters extracted from adminUser.id
- * Example: "Alex Morgan" with UUID "92f98f68..." -> "ALEX9298"
- */
-export function formatAdminAlphanumericId(name?: string, rawId?: string): string {
-  const letters = (name || '').replace(/[^a-zA-Z]/g, '').toUpperCase();
-  const namePrefix = (letters + 'ADMN').slice(0, 4);
-
-  const cleanRaw = (rawId || '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
-  const digitsOnly = cleanRaw.replace(/[^0-9]/g, '');
-
-  let suffix = digitsOnly.slice(0, 4);
-  if (suffix.length < 4) {
-    suffix = (digitsOnly + '2026').slice(0, 4);
-  }
-
-  return `${namePrefix}${suffix}`;
-}
 
 interface AdminProfileViewProps {
   adminUser: AdminSessionUser;
@@ -67,8 +44,6 @@ export const AdminProfileView: React.FC<AdminProfileViewProps> = ({
   const [saving, setSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [copiedId, setCopiedId] = useState(false);
-
   // Sync activeSection if initialSection prop changes
   React.useEffect(() => {
     if (initialSection) {
@@ -81,17 +56,6 @@ export const AdminProfileView: React.FC<AdminProfileViewProps> = ({
     const raw = (fullName || adminUser.fullName || adminUser.email || 'A').trim();
     return raw.charAt(0).toUpperCase();
   }, [fullName, adminUser.fullName, adminUser.email]);
-
-  // Compute strictly alphanumeric ID starting with 4 letters of name
-  const alphanumericId = React.useMemo(() => {
-    return formatAdminAlphanumericId(fullName || adminUser.fullName, adminUser.id);
-  }, [fullName, adminUser.fullName, adminUser.id]);
-
-  const handleCopyId = () => {
-    navigator.clipboard.writeText(alphanumericId);
-    setCopiedId(true);
-    setTimeout(() => setCopiedId(false), 2000);
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -169,24 +133,7 @@ export const AdminProfileView: React.FC<AdminProfileViewProps> = ({
               <p className="text-xs sm:text-sm text-indigo-200 mt-0.5">
                 {adminUser.email}
               </p>
-              <div className="mt-2 flex items-center gap-2">
-                <span className="text-[11px] font-mono font-bold tracking-wider text-indigo-100 bg-indigo-950/70 px-2 py-0.5 rounded-md border border-indigo-500/30">
-                  ID: {alphanumericId}
-                </span>
-                <button
-                  onClick={handleCopyId}
-                  type="button"
-                  className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-200 hover:text-white transition-colors cursor-pointer"
-                  title="Copy alphanumeric ID"
-                >
-                  {copiedId ? (
-                    <Check className="h-3 w-3 text-emerald-400" />
-                  ) : (
-                    <Copy className="h-3 w-3" />
-                  )}
-                  <span>{copiedId ? 'Copied' : 'Copy'}</span>
-                </button>
-              </div>
+
             </div>
           </div>
 
@@ -260,8 +207,8 @@ export const AdminProfileView: React.FC<AdminProfileViewProps> = ({
               {activeSection === 'profile' ? 'Personal Information & Identity' : 'Security & Access Credentials'}
             </h2>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-              {activeSection === 'profile' 
-                ? 'Update your administrative account display name, email address, and view your system ID.' 
+              {activeSection === 'profile'
+                ? 'Update your administrative account display name and email address.'
                 : 'Change your administrative sign-in password and manage account credentials.'}
             </p>
           </div>
@@ -340,47 +287,7 @@ export const AdminProfileView: React.FC<AdminProfileViewProps> = ({
                 </p>
               </div>
 
-              {/* Admin Alphanumeric ID */}
-              <div className="sm:col-span-2">
-                <label 
-                  htmlFor="admin_alphanumeric_id"
-                  className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-2"
-                >
-                  Admin Alphanumeric ID
-                </label>
-                <div className="relative flex items-center">
-                  <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-500 dark:text-slate-400">
-                    <ShieldCheck className="h-4 w-4 text-indigo-500" />
-                  </div>
-                  <input
-                    id="admin_alphanumeric_id"
-                    type="text"
-                    readOnly
-                    value={alphanumericId}
-                    className="w-full rounded-xl border border-slate-300 bg-slate-100/90 py-2.5 pl-10 pr-24 text-xs font-mono font-bold text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 cursor-not-allowed select-all shadow-xs"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleCopyId}
-                    className="absolute inset-y-0 right-0 flex items-center gap-1 pr-3 text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors cursor-pointer"
-                  >
-                    {copiedId ? (
-                      <>
-                        <Check className="h-3.5 w-3.5 text-emerald-500" />
-                        <span className="text-emerald-600 dark:text-emerald-400">Copied</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="h-3.5 w-3.5" />
-                        <span>Copy ID</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-                <p className="mt-1.5 text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                  Strictly alphanumeric identifier starting with the first 4 letters of your name followed by 4 digits.
-                </p>
-              </div>
+
             </div>
           )}
 
@@ -490,7 +397,6 @@ export const AdminProfileView: React.FC<AdminProfileViewProps> = ({
                   className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 transition-colors cursor-pointer self-start sm:self-auto shrink-0 shadow-xs"
                 >
                   <span>Configure 2FA</span>
-                  <ArrowRight className="h-3.5 w-3.5" />
                 </button>
               </div>
 
@@ -520,7 +426,6 @@ export const AdminProfileView: React.FC<AdminProfileViewProps> = ({
                 </>
               ) : (
                 <>
-                  <Save className="h-4 w-4" />
                   <span>{activeSection === 'profile' ? 'Save Profile' : 'Update Password'}</span>
                 </>
               )}
@@ -530,23 +435,6 @@ export const AdminProfileView: React.FC<AdminProfileViewProps> = ({
         </form>
       </div>
       )}
-
-      {/* Account Security Information Card */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400">
-            <ShieldCheck className="h-5 w-5" />
-          </div>
-          <div>
-            <h3 className="text-xs font-bold text-slate-900 dark:text-white">
-              Supabase Authentication Security
-            </h3>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400">
-              Role-Based Access Control (RBAC) enforced with JWT tokens and PostgreSQL Row Level Security.
-            </p>
-          </div>
-        </div>
-      </div>
 
     </div>
   );

@@ -1,17 +1,14 @@
 import React, { useState } from 'react';
-import { 
-  Building2, 
-  MapPin, 
-  ArrowRight, 
-  Search, 
-  Globe2, 
-  Laptop, 
+import {
+  Building2,
+  ArrowRight,
+  Search,
   Building,
-  CheckCircle2,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
 } from 'lucide-react';
 import { Job } from '../types/job';
+import { sortJobsByNewest } from '../utils/jobUtils';
 
 interface CompaniesPageProps {
   jobs: Job[];
@@ -26,12 +23,12 @@ export const CompaniesPage: React.FC<CompaniesPageProps> = ({
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const ITEMS_PER_PAGE = 12;
+  const ITEMS_PER_PAGE = 15;
 
   // Group jobs by company name
   const companyMap = new Map<string, Job[]>();
 
-  jobs.forEach((job) => {
+  sortJobsByNewest(jobs).forEach((job) => {
     const rawName = (job.companyName || '').trim();
     if (!rawName) return;
     const existing = companyMap.get(rawName) || [];
@@ -85,11 +82,7 @@ export const CompaniesPage: React.FC<CompaniesPageProps> = ({
       {/* Hero Header */}
       <section className="relative overflow-hidden pt-8 pb-12 sm:pt-12 sm:pb-16 bg-radial-[at_50%_0%] from-indigo-50/70 via-slate-50 to-white dark:from-indigo-950/30 dark:via-slate-950 dark:to-slate-950 border-b border-slate-200/80 dark:border-slate-800">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 text-center">
-          
-          <div className="inline-flex items-center gap-1.5 rounded-full border border-indigo-200 bg-indigo-50/80 px-3 py-1 text-xs font-semibold text-indigo-700 shadow-2xs dark:border-indigo-800/80 dark:bg-indigo-950/60 dark:text-indigo-300 mb-4">
-            <Building className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
-            <span>Verified Employer Directory</span>
-          </div>
+
 
           <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-slate-900 dark:text-white max-w-3xl mx-auto">
             Browse Hiring{' '}
@@ -150,94 +143,54 @@ export const CompaniesPage: React.FC<CompaniesPageProps> = ({
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {paginatedCompanies.map((company) => {
+              const recentJob = company.jobs[0];
               return (
-                <div
+                <article
                   key={company.name}
-                  className="group flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-6 shadow-xs hover:border-indigo-400 hover:shadow-md dark:border-slate-800 dark:bg-slate-900/90 dark:hover:border-indigo-600/70 transition-all duration-200"
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Explore jobs at ${company.name}`}
+                  onClick={() => onNavigate(`/company/${encodeURIComponent(company.name)}`)}
+                  onKeyDown={(event) => {
+                    if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) {
+                      event.preventDefault();
+                      onNavigate(`/company/${encodeURIComponent(company.name)}`);
+                    }
+                  }}
+                  className="group relative flex cursor-pointer flex-col justify-between overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-indigo-400 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 dark:border-slate-800 dark:bg-slate-900/90 dark:hover:border-indigo-600/70 dark:focus-visible:ring-offset-slate-950"
                 >
-                  <div>
-                    {/* Header */}
-                    <div className="flex items-start justify-between gap-3 mb-3">
-                      <div>
-                        <h3 className="text-lg font-bold text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
-                          {company.name}
-                        </h3>
-                        {company.locations.length > 0 && (
-                          <div className="mt-1 flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
-                            <MapPin className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                            <span className="truncate max-w-[200px]">
-                              {company.locations.slice(0, 2).join(', ')}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-
-                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-950/50 dark:text-indigo-300 dark:border-indigo-800/40 shrink-0">
-                        {company.count} {company.count === 1 ? 'role' : 'roles'}
-                      </span>
-                    </div>
-
-                    {/* Work Arrangement Badges */}
-                    <div className="flex flex-wrap items-center gap-1.5 mt-3">
-                      {company.arrangements.map((arr) => (
-                        <span
-                          key={arr}
-                          className="inline-flex items-center gap-1 rounded-md bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-[10px] font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider"
-                        >
-                          {arr === 'remote' ? (
-                            <Laptop className="h-3 w-3 text-emerald-500" />
-                          ) : arr === 'hybrid' ? (
-                            <Globe2 className="h-3 w-3 text-indigo-500" />
-                          ) : (
-                            <Building2 className="h-3 w-3 text-sky-500" />
-                          )}
-                          {arr}
+                  <Building2
+                    aria-hidden="true"
+                    className="pointer-events-none absolute -right-3 -top-4 h-32 w-32 text-indigo-500/[0.07] transition-transform duration-300 group-hover:scale-110 dark:text-indigo-300/[0.08]"
+                  />
+                  <div className="relative z-10">
+                    <h3 className="text-base font-bold text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                      {company.name}
+                    </h3>
+                    {recentJob && (
+                      <div className="mt-4 space-y-1.5 border-t border-slate-100 dark:border-slate-800/80 pt-3">
+                        <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                          Recent Opening
                         </span>
-                      ))}
-                    </div>
-
-                    {/* Department Tags */}
-                    {company.categories.length > 0 && (
-                      <div className="mt-3 flex flex-wrap gap-1">
-                        {company.categories.slice(0, 3).map((cat) => (
-                          <span
-                            key={cat}
-                            className="rounded-md bg-slate-50 border border-slate-200/60 dark:bg-slate-950 dark:border-slate-800 px-2 py-0.5 text-[11px] font-medium text-slate-600 dark:text-slate-400"
-                          >
-                            {cat}
-                          </span>
-                        ))}
+                        <button
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            onSelectJob(recentJob.slug || recentJob.id);
+                          }}
+                          className="block w-full text-left truncate text-xs font-medium text-slate-700 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+                        >
+                          {recentJob.title}{' '}
+                          <span className="text-[11px] text-slate-400 font-normal">at {company.name}</span>
+                        </button>
                       </div>
                     )}
-
-                    {/* Active Openings Preview */}
-                    <div className="mt-4 space-y-1.5 border-t border-slate-100 dark:border-slate-800/80 pt-3">
-                      <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                        Active Roles
-                      </span>
-                      {company.jobs.slice(0, 2).map((j) => (
-                        <button
-                          key={j.id}
-                          onClick={() => onSelectJob(j.slug || j.id)}
-                          className="block w-full text-left truncate text-xs font-medium text-slate-700 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors cursor-pointer"
-                        >
-                          • {j.title}
-                        </button>
-                      ))}
-                    </div>
                   </div>
-
-                  {/* Footer Action */}
-                  <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800">
-                    <button
-                      onClick={() => onNavigate(`/company/${encodeURIComponent(company.name)}`)}
-                      className="inline-flex items-center justify-between w-full text-xs font-bold text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 transition-colors cursor-pointer"
-                    >
-                      <span>Explore all {company.name} jobs ({company.count})</span>
-                      <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
-                    </button>
+                  <div className="relative z-10 mt-6 flex justify-end border-t border-slate-100 pt-4 dark:border-slate-800">
+                    <span className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-indigo-600 transition-all group-hover:translate-x-0.5 dark:border-slate-700 dark:bg-slate-800 dark:text-indigo-400">
+                      <ArrowRight className="h-4 w-4" />
+                    </span>
                   </div>
-                </div>
+                </article>
               );
             })}
           </div>

@@ -157,4 +157,3 @@ export function onAdminAuthStateChange(callback: (user: AdminSessionUser | null)
     subscription.unsubscribe();
   };
 }
-

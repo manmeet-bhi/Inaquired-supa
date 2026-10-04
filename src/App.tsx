@@ -67,9 +67,27 @@ function MainApp() {
     '/terms': 'Terms of Service | inaquired',
     '/cookies': 'Cookie Policy | inaquired',
     '/cookie-policy': 'Cookie Policy | inaquired',
-    '/admin': 'Admin Control Panel | inaquired',
-    '/admin/forgot-password': 'Reset Password | inaquired',
-    '/admin/reset-password': 'Set New Password | inaquired',
+    '/admin': 'Dashboard | Admin Console | inaquired',
+    '/admin/home': 'Dashboard | Admin Console | inaquired',
+    '/admin/dashboard': 'Dashboard | Admin Console | inaquired',
+    '/admin/jobs': 'Listings | Admin Console | inaquired',
+    '/admin/drafts': 'Draft Listings | Admin Console | inaquired',
+    '/admin/archived': 'Archived Listings | Admin Console | inaquired',
+    '/admin/add-new-job': 'Create Job Listing | Admin Console | inaquired',
+    '/admin/jobs/new': 'Create Job Listing | Admin Console | inaquired',
+    '/admin/departments': 'Departments | Admin Console | inaquired',
+    '/admin/add-new-department': 'Create Department | Admin Console | inaquired',
+    '/admin/categories/new': 'Create Department | Admin Console | inaquired',
+    '/admin/users': 'Users & Access | Admin Console | inaquired',
+    '/admin/add-new-user': 'Add Administrator | Admin Console | inaquired',
+    '/admin/users/new': 'Add Administrator | Admin Console | inaquired',
+    '/admin/seo': 'SEO Suite | Admin Console | inaquired',
+    '/admin/profile': 'Account Settings | Admin Console | inaquired',
+    '/admin/security': 'Security Settings | Admin Console | inaquired',
+    '/admin/2fa': 'Two-Factor Authentication | Admin Console | inaquired',
+    '/admin/two-factor': 'Two-Factor Authentication | Admin Console | inaquired',
+    '/admin/forgot-password': 'Account Recovery | Admin Console | inaquired',
+    '/admin/reset-password': 'Set New Password | Admin Console | inaquired',
   };
 
   const navigate = (path: string) => {
@@ -104,8 +122,10 @@ function MainApp() {
       document.title = staticTitle;
     }
 
-    // 2. Then override with admin-configured SEO from Supabase
-    applyRouteSEO(path);
+    // Public pages use configured SEO; admin titles are managed by their route and active view.
+    if (!path.startsWith('/admin')) {
+      applyRouteSEO(path);
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPath]);
 

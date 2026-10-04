@@ -179,7 +179,7 @@ export const AdminHomeDashboard: React.FC<AdminHomeDashboardProps> = ({
               onClick={() => onNavigate('/admin/jobs')}
               className="text-xs font-semibold text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 cursor-pointer"
             >
-              View all jobs →
+              View all jobs
             </button>
           </div>
 

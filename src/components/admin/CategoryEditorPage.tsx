@@ -4,7 +4,6 @@ import {
   Layers, 
   Link as LinkIcon, 
   AlignLeft, 
-  Check, 
   AlertCircle,
   FolderTree,
   ExternalLink
@@ -122,10 +121,7 @@ export const CategoryEditorPage: React.FC<CategoryEditorPageProps> = ({
                   <span>Saving...</span>
                 </>
               ) : (
-                <>
-                  <Check className="h-4 w-4" />
-                  <span>{isEditing ? 'Save Changes' : 'Create Department'}</span>
-                </>
+                <span>{isEditing ? 'Save Changes' : 'Create Department'}</span>
               )}
             </button>
           </div>

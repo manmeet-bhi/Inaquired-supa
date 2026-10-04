@@ -103,7 +103,9 @@ export const HomePage: React.FC<HomePageProps> = ({
   const filteredJobs = filterJobs(mergedJobs, filters);
   
   // Quick spotlight sections
-  const remoteJobs = jobs.filter((j) => j.workArrangement === 'remote').slice(0, 3);
+  const remoteJobs = jobs
+    .filter((job) => job.workArrangement === 'remote' && job.featured)
+    .slice(0, 10);
   const internships = jobs.filter((j) => j.jobType === 'internship').slice(0, 3);
   const featuredJobs = jobs.filter((j) => j.featured).slice(0, 3);
 

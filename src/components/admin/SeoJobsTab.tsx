@@ -416,7 +416,6 @@ export const SeoJobsTab: React.FC<SeoJobsTabProps> = ({ onShowToast, siteName })
                 disabled={saving}
                 className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-xs font-semibold text-white shadow-xs disabled:opacity-50 cursor-pointer"
               >
-                <Save className="h-3.5 w-3.5" />
                 <span>{saving ? 'Saving...' : 'Save Job SEO'}</span>
               </button>
             </div>
