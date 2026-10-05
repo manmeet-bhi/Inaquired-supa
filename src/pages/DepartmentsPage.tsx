@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   Code2, 
   Palette, 
@@ -162,6 +162,12 @@ export const DepartmentsPage: React.FC<DepartmentsPageProps> = ({
   const totalPages = Math.ceil(filteredDepartments.length / ITEMS_PER_PAGE);
   const paginatedDepartments = filteredDepartments.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
+  useEffect(() => {
+    if (currentPage > Math.max(totalPages, 1)) {
+      setCurrentPage(Math.max(totalPages, 1));
+    }
+  }, [currentPage, totalPages]);
+
   return (
     <div className="space-y-10 sm:space-y-14 pb-16">
       
@@ -190,7 +196,10 @@ export const DepartmentsPage: React.FC<DepartmentsPageProps> = ({
               <input
                 type="text"
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setCurrentPage(1);
+                }}
                 placeholder="Search departments (e.g. Engineering, Design)..."
                 className="w-full rounded-xl border border-slate-300 bg-white py-2.5 pl-10 pr-4 text-xs sm:text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:border-indigo-600 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-500 shadow-xs transition-colors"
               />

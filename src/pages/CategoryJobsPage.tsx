@@ -126,6 +126,12 @@ export const CategoryJobsPage: React.FC<CategoryJobsPageProps> = ({
   const totalPages = Math.ceil(filtered.length / JOBS_PER_PAGE);
   const paginatedJobs = filtered.slice((currentPage - 1) * JOBS_PER_PAGE, currentPage * JOBS_PER_PAGE);
 
+  useEffect(() => {
+    if (currentPage > Math.max(totalPages, 1)) {
+      setCurrentPage(Math.max(totalPages, 1));
+    }
+  }, [currentPage, totalPages]);
+
   return (
     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 sm:py-12 space-y-8">
       

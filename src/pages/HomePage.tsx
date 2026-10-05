@@ -15,7 +15,9 @@ import {
   DollarSign,
   Settings,
   Users,
-  Headphones
+  Headphones,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { JobIcon } from '../components/icons/JobIcon';
 import { Job, JobFiltersState } from '../types/job';
@@ -53,10 +55,13 @@ export const HomePage: React.FC<HomePageProps> = ({
 
   const [dbSearchResults, setDbSearchResults] = useState<Job[]>([]);
   const [isSearchingDb, setIsSearchingDb] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const JOBS_PER_PAGE = 12;
 
   // Sync external search keyword from Navbar in real-time
   React.useEffect(() => {
     setFilters((prev) => (prev.keyword !== keyword ? { ...prev, keyword } : prev));
+    setCurrentPage(1);
   }, [keyword]);
 
   // Debounced live database query when searching
@@ -83,6 +88,7 @@ export const HomePage: React.FC<HomePageProps> = ({
 
   const handleFilterUpdate = (newFilters: JobFiltersState) => {
     setFilters(newFilters);
+    setCurrentPage(1);
     if (onKeywordChange && newFilters.keyword !== keyword) {
       onKeywordChange(newFilters.keyword);
     }
@@ -101,23 +107,32 @@ export const HomePage: React.FC<HomePageProps> = ({
 
   const categories = Array.from(new Set(mergedJobs.map((j) => j.category).filter(Boolean)));
   const filteredJobs = filterJobs(mergedJobs, filters);
+  const totalPages = Math.ceil(filteredJobs.length / JOBS_PER_PAGE);
+  const paginatedJobs = filteredJobs.slice((currentPage - 1) * JOBS_PER_PAGE, currentPage * JOBS_PER_PAGE);
+
+  React.useEffect(() => {
+    if (currentPage > Math.max(totalPages, 1)) {
+      setCurrentPage(Math.max(totalPages, 1));
+    }
+  }, [currentPage, totalPages]);
   
   // Quick spotlight sections
   const remoteJobs = jobs
     .filter((job) => job.workArrangement === 'remote' && job.featured)
-    .slice(0, 10);
+    .slice(0, 6);
   const internships = jobs.filter((j) => j.jobType === 'internship').slice(0, 3);
   const featuredJobs = jobs.filter((j) => j.featured).slice(0, 3);
 
   const handleQuickArrangement = (arrangement: string) => {
     setFilters((prev) => ({ ...prev, workArrangement: arrangement }));
+    setCurrentPage(1);
   };
 
   return (
     <div className="space-y-12 sm:space-y-16 pb-16">
       
       {/* Hero Section */}
-      <section className="relative overflow-hidden pt-8 pb-12 sm:pt-14 sm:pb-16 bg-radial-[at_50%_0%] from-indigo-50/60 via-slate-50 to-white dark:from-indigo-950/30 dark:via-slate-950 dark:to-slate-950 border-b border-slate-200/80 dark:border-slate-800">
+      {currentPage === 1 && <section className="relative overflow-hidden pt-8 pb-12 sm:pt-14 sm:pb-16 bg-radial-[at_50%_0%] from-indigo-50/60 via-slate-50 to-white dark:from-indigo-950/30 dark:via-slate-950 dark:to-slate-950 border-b border-slate-200/80 dark:border-slate-800">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 text-center">
           
           {/* Badge */}
@@ -171,10 +186,13 @@ export const HomePage: React.FC<HomePageProps> = ({
             </button>
           </div>
         </div>
-      </section>
+      </section>}
 
       {/* Main Content Area: Search & Listings */}
-      <section id="browse-jobs-section" className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <section
+        id="browse-jobs-section"
+        className={`mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 ${currentPage > 1 ? 'pt-8 sm:pt-12' : ''}`}
+      >
         
         {/* Search & Filter Component */}
         <div className="mb-8">
@@ -228,13 +246,70 @@ export const HomePage: React.FC<HomePageProps> = ({
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {filteredJobs.map((job) => (
+            {paginatedJobs.map((job) => (
               <JobCard
                 key={job.id}
                 job={job}
                 onClick={onSelectJob}
               />
             ))}
+          </div>
+        )}
+
+        {!loading && filteredJobs.length > 0 && totalPages > 1 && (
+          <div className="mt-6 flex items-center justify-between border-t border-slate-200 pt-4 dark:border-slate-800">
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Showing{' '}
+              <strong className="text-slate-800 dark:text-slate-200">
+                {(currentPage - 1) * JOBS_PER_PAGE + 1}–{Math.min(currentPage * JOBS_PER_PAGE, filteredJobs.length)}
+              </strong>{' '}
+              of <strong className="text-slate-800 dark:text-slate-200">{filteredJobs.length}</strong> jobs
+            </p>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => {
+                  setCurrentPage((page) => Math.max(1, page - 1));
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                disabled={currentPage === 1}
+                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+              >
+                <ChevronLeft className="h-3.5 w-3.5" />
+                Prev
+              </button>
+              {Array.from({ length: Math.min(5, totalPages) }, (_, index) => {
+                const page = totalPages <= 5 ? index + 1 : Math.max(1, Math.min(currentPage - 2, totalPages - 4)) + index;
+                return (
+                  <button
+                    key={page}
+                    onClick={() => {
+                      setCurrentPage(page);
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
+                    aria-current={currentPage === page ? 'page' : undefined}
+                    aria-label={`Go to page ${page}`}
+                    className={`inline-flex h-8 w-8 items-center justify-center rounded-lg text-xs font-bold transition-colors ${
+                      currentPage === page
+                        ? 'bg-indigo-600 text-white shadow-xs'
+                        : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800'
+                    }`}
+                  >
+                    {page}
+                  </button>
+                );
+              })}
+              <button
+                onClick={() => {
+                  setCurrentPage((page) => Math.min(totalPages, page + 1));
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                disabled={currentPage === totalPages}
+                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+              >
+                Next
+                <ChevronRight className="h-3.5 w-3.5" />
+              </button>
+            </div>
           </div>
         )}
       </section>
