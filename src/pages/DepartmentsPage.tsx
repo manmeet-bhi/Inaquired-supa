@@ -1,12 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { 
   Code2, 
+  Wrench,
   Palette, 
   Sparkles, 
+  BrainCircuit,
   TrendingUp, 
   Database, 
   DollarSign, 
+  Handshake,
   Settings, 
+  BriefcaseBusiness,
   Users, 
   Headphones,
   Wallet,
@@ -16,6 +20,18 @@ import {
   Clapperboard,
   ShoppingBag,
   Truck,
+  BookOpen,
+  Stethoscope,
+  ShieldCheck,
+  Leaf,
+  Microscope,
+  Megaphone,
+  Calculator,
+  HardHat,
+  Languages,
+  Cog,
+  Network,
+  FlaskConical,
   Layers, 
   ArrowRight, 
   Search,
@@ -44,24 +60,57 @@ interface DepartmentDef {
 const getDepartmentIcon = (name: string, slug: string): DepartmentDef['icon'] => {
   const department = `${name} ${slug}`.toLowerCase();
 
-  if (/engineer|develop|software|technology|\bit\b/.test(department)) return Code2;
+  if (/customer|client support|customer service/.test(department)) return Headphones;
+  if (/data.*ai|ai.*data|machine learning/.test(department)) return BrainCircuit;
+  if (/data|analytic|research/.test(department)) return Database;
+  if (/engineering|engineer|develop|software|technology|\bit\b/.test(department)) return Code2;
+  if (/manufactur|production/.test(department)) return Factory;
+  if (/supply chain|logistic/.test(department)) return Truck;
+  if (/government|public sector/.test(department)) return Landmark;
+  if (/finance|account|bank/.test(department)) return Wallet;
+  if (/retail|e-commerce|ecommerce/.test(department)) return ShoppingBag;
+  if (/media|entertain/.test(department)) return Clapperboard;
+  if (/security|compliance|legal/.test(department)) return ShieldCheck;
+  if (/administrat|office support/.test(department)) return BriefcaseBusiness;
   if (/design|creative|art/.test(department)) return Palette;
   if (/product/.test(department)) return Sparkles;
-  if (/data|analytic|ai|research/.test(department)) return Database;
-  if (/media|entertain/.test(department)) return Clapperboard;
   if (/market|growth/.test(department)) return TrendingUp;
-  if (/sales|business develop|partnership/.test(department)) return DollarSign;
-  if (/operation|strategy|administrat|office support/.test(department)) return Settings;
+  if (/sales|business develop|partnership/.test(department)) return Handshake;
+  if (/operation|strategy|project management/.test(department)) return Settings;
   if (/people|human resource|hr|recruit|talent/.test(department)) return Users;
-  if (/customer|support|service/.test(department)) return Headphones;
-  if (/finance|account|bank/.test(department)) return Wallet;
-  if (/government|public sector/.test(department)) return Landmark;
-  if (/manufactur|production/.test(department)) return Factory;
-  if (/retail|e-commerce|ecommerce/.test(department)) return ShoppingBag;
-  if (/supply chain|logistic/.test(department)) return Truck;
-  if (/security|compliance|legal/.test(department)) return ClipboardList;
-
+  if (/education|training|academic/.test(department)) return BookOpen;
+  if (/health|medical|clinical|wellness/.test(department)) return Stethoscope;
+  if (/environment|sustainability|agriculture/.test(department)) return Leaf;
+  if (/science|laboratory|lab/.test(department)) return Microscope;
+  if (/communication|public relation/.test(department)) return Megaphone;
+  if (/accounting|payroll|tax/.test(department)) return Calculator;
+  if (/construction|architecture/.test(department)) return HardHat;
+  if (/language|translation/.test(department)) return Languages;
+  if (/maintenance|facilities/.test(department)) return Cog;
+  if (/network|infrastructure|cloud/.test(department)) return Network;
+  if (/chemical|chemistry|pharma/.test(department)) return FlaskConical;
   return Layers;
+};
+
+const DEPARTMENT_ICON_FALLBACKS: DepartmentDef['icon'][] = [
+  Code2, Wrench, Palette, Sparkles, BrainCircuit, TrendingUp, Database, DollarSign,
+  Handshake, Settings, BriefcaseBusiness, Users, Headphones, Wallet, ClipboardList,
+  Landmark, Factory, Clapperboard, ShoppingBag, Truck, BookOpen, Stethoscope,
+  ShieldCheck, Leaf, Microscope, Megaphone, Calculator, HardHat, Languages, Cog,
+  Network, FlaskConical, Layers,
+];
+
+const assignUniqueDepartmentIcons = (departments: DepartmentDef[]): DepartmentDef[] => {
+  const usedIcons = new Set<DepartmentDef['icon']>();
+
+  return departments.map((department) => {
+    const preferredIcon = getDepartmentIcon(department.name, department.slug);
+    const icon = !usedIcons.has(preferredIcon)
+      ? preferredIcon
+      : DEPARTMENT_ICON_FALLBACKS.find((candidate) => !usedIcons.has(candidate)) || preferredIcon;
+    usedIcons.add(icon);
+    return { ...department, icon };
+  });
 };
 
 const DEFAULT_DEPARTMENTS: DepartmentDef[] = [
@@ -167,7 +216,7 @@ export const DepartmentsPage: React.FC<DepartmentsPageProps> = ({
   });
 
   // Calculate job counts and active jobs per department
-  const departmentStats = allDepartments.map((dept) => {
+  const departmentStats = assignUniqueDepartmentIcons(allDepartments).map((dept) => {
     const matchedJobs = newestFirstJobs.filter((j) => {
       const cat = (j.category || '').toLowerCase();
       const title = (j.title || '').toLowerCase();
