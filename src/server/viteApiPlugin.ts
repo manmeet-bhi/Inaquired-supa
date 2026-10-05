@@ -9,6 +9,7 @@ import {
   handleForgotPassword,
   handleVerifyRecoveryToken,
   handleResetPassword,
+  getRecoverySystemHealth,
   sendJsonResponse
 } from './recoveryApiHandlers.ts';
 import {
@@ -153,13 +154,7 @@ export function viteAccountRecoveryPlugin(): Plugin {
         }
 
         if (url === '/api/auth/health' && req.method === 'GET') {
-          const hasApiKey = Boolean(process.env.RESEND_API_KEY && process.env.RESEND_API_KEY.startsWith('re_'));
-          return sendJsonResponse(res, 200, {
-            status: 'ok',
-            service: 'inaquired-auth-recovery-2fa',
-            resendConfigured: hasApiKey,
-            fromEmail: process.env.RESEND_FROM_EMAIL || ''
-          });
+          return sendJsonResponse(res, 200, getRecoverySystemHealth());
         }
 
         next();

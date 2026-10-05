@@ -11,6 +11,8 @@ export interface Category {
 
 export type Unsubscribe = () => void;
 
+let categoriesSubscriptionId = 0;
+
 /**
  * Fetches all categories / departments from Supabase
  */
@@ -58,7 +60,7 @@ export function subscribeToCategories(
   load();
 
   const channel = supabase
-    .channel('public:categories_sync')
+    .channel(`public:categories_sync:${++categoriesSubscriptionId}`)
     .on(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'categories' },

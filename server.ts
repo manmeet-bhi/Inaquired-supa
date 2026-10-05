@@ -7,6 +7,7 @@ import {
   handleForgotPassword,
   handleVerifyRecoveryToken,
   handleResetPassword,
+  getRecoverySystemHealth,
   sendJsonResponse
 } from './src/server/recoveryApiHandlers.ts';
 import {
@@ -84,13 +85,7 @@ app.post('/api/auth/2fa/get-backup-codes', (req, res) => handleGetBackupCodes(re
 app.post('/api/auth/2fa/disable', (req, res) => handleDisable2Fa(req, res));
 
 app.get('/api/auth/health', (req, res) => {
-  const hasApiKey = Boolean(process.env.RESEND_API_KEY && process.env.RESEND_API_KEY.startsWith('re_'));
-  return sendJsonResponse(res, 200, {
-    status: 'ok',
-    service: 'inaquired-auth-recovery-2fa',
-    resendConfigured: hasApiKey,
-    fromEmail: process.env.RESEND_FROM_EMAIL || ''
-  });
+  return sendJsonResponse(res, 200, getRecoverySystemHealth());
 });
 
 // Search Engine Optimization (SEO) & Web Crawler Endpoints

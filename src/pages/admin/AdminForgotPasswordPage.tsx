@@ -1,11 +1,16 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   ArrowLeft, 
   AlertCircle, 
   CheckCircle2, 
   RefreshCw
 } from 'lucide-react';
-import { requestPasswordReset, ForgotPasswordResponse } from '../../services/accountRecoveryService';
+import {
+  checkRecoveryHealth,
+  requestPasswordReset,
+  ForgotPasswordResponse,
+  RecoverySystemHealth
+} from '../../services/accountRecoveryService';
 import { AdminAuthLayout } from '../../components/admin/AdminAuthLayout';
 
 interface AdminForgotPasswordPageProps {
@@ -20,6 +25,17 @@ export const AdminForgotPasswordPage: React.FC<AdminForgotPasswordPageProps> = (
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successInfo, setSuccessInfo] = useState<ForgotPasswordResponse | null>(null);
   const [resendCooldown, setResendCooldown] = useState(0);
+  const [recoveryHealth, setRecoveryHealth] = useState<RecoverySystemHealth | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    checkRecoveryHealth().then((health) => {
+      if (mounted) setRecoveryHealth(health);
+    });
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -97,6 +113,15 @@ export const AdminForgotPasswordPage: React.FC<AdminForgotPasswordPageProps> = (
             <div className="mb-5 flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700 animate-in fade-in dark:border-rose-900 dark:bg-rose-950/50 dark:text-rose-200">
               <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
               <span>{errorMessage}</span>
+            </div>
+          )}
+
+          {recoveryHealth && (!recoveryHealth.resendConfigured || !recoveryHealth.databaseConfigured) && (
+            <div role="status" className="mb-5 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+              <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+              <span>
+                Password recovery is not fully configured. Please contact your system administrator.
+              </span>
             </div>
           )}
 

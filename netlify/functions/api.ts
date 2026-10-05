@@ -2,6 +2,7 @@ import {
   handleForgotPassword,
   handleVerifyRecoveryToken,
   handleResetPassword,
+  getRecoverySystemHealth,
   sendJsonResponse
 } from '../../src/server/recoveryApiHandlers.ts';
 import {
@@ -121,13 +122,7 @@ export const handler = async (event: any, context: any) => {
     } else if (rawPath === '/api/public/jobs' && event.httpMethod === 'GET') {
       await handlePublicJobs(req, res);
     } else if (rawPath === '/api/auth/health' && event.httpMethod === 'GET') {
-      const hasApiKey = Boolean(process.env.RESEND_API_KEY && process.env.RESEND_API_KEY.startsWith('re_'));
-      sendJsonResponse(res, 200, {
-        status: 'ok',
-        service: 'inaquired-auth-recovery-2fa',
-        resendConfigured: hasApiKey,
-        fromEmail: process.env.RESEND_FROM_EMAIL || ''
-      });
+      sendJsonResponse(res, 200, getRecoverySystemHealth());
     } else {
       sendJsonResponse(res, 404, { success: false, error: `Endpoint not found: ${rawPath}` });
     }

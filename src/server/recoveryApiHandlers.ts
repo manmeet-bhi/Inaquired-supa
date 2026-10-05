@@ -8,6 +8,22 @@ dotenv.config();
 
 const { Pool } = pg;
 
+export function getRecoverySystemHealth() {
+  const resendApiKey = (process.env.RESEND_API_KEY || '').trim();
+  const resendConfigured = resendApiKey.startsWith('re_') && resendApiKey !== 're_your_api_key_here';
+  const databaseConfigured = Boolean(
+    process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() || process.env.SUPABASE_DIRECT_URL?.trim()
+  );
+
+  return {
+    status: resendConfigured && databaseConfigured ? 'ok' : 'degraded',
+    service: 'inaquired-auth-recovery-2fa',
+    resendConfigured,
+    databaseConfigured,
+    fromEmail: process.env.RESEND_FROM_EMAIL || '',
+  };
+}
+
 // Supabase credentials
 const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';

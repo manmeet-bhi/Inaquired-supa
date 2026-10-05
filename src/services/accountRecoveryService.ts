@@ -21,6 +21,7 @@ export interface ResetPasswordResponse {
 export interface RecoverySystemHealth {
   status: string;
   resendConfigured: boolean;
+  databaseConfigured: boolean;
   fromEmail: string;
 }
 
@@ -146,6 +147,7 @@ export async function checkRecoveryHealth(): Promise<RecoverySystemHealth> {
   return {
     status: 'standalone',
     resendConfigured: false,
+    databaseConfigured: false,
     fromEmail: 'onboarding@resend.dev'
   };
 }
