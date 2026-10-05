@@ -22,6 +22,7 @@ function mapFromDb(row: any): Job {
     responsibilities: row.responsibilities,
     requirements: row.requirements,
     benefits: row.benefits,
+    benefitsTitle: row.benefits_title || row.benefitsTitle,
     applicationUrl: row.application_url || row.applicationUrl,
     applicationDeadline: row.application_deadline || row.applicationDeadline,
     tags: row.tags || [],
@@ -56,6 +57,7 @@ function mapToDb(job: Partial<Job>): Record<string, any> {
   if (job.responsibilities !== undefined) row.responsibilities = job.responsibilities;
   if (job.requirements !== undefined) row.requirements = job.requirements;
   if (job.benefits !== undefined) row.benefits = job.benefits;
+  if (job.benefitsTitle !== undefined) row.benefits_title = job.benefitsTitle;
   if (job.applicationUrl !== undefined) row.application_url = job.applicationUrl;
   if (job.applicationDeadline !== undefined) row.application_deadline = job.applicationDeadline;
   if (job.tags !== undefined) row.tags = job.tags;

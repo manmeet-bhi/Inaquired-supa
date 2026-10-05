@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { 
   ArrowLeft, 
   MapPin, 
-  DollarSign, 
+  Wallet,
   Calendar, 
   Clock, 
   Share2, 
@@ -242,7 +242,7 @@ export const JobDetailPage: React.FC<JobDetailPageProps> = ({ slug, jobs, onNavi
                 <span>{job.location}</span>
               </span>
               <span className="inline-flex items-center gap-1.5 font-medium text-slate-900 dark:text-white">
-                <DollarSign className="h-4 w-4 text-slate-400" />
+                <Wallet className="h-4 w-4 text-slate-400" />
                 <span>{formatSalary(job.salaryMin, job.salaryMax, job.currency)}</span>
               </span>
               <span className="capitalize inline-flex items-center gap-1 rounded-md bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
@@ -324,7 +324,7 @@ export const JobDetailPage: React.FC<JobDetailPageProps> = ({ slug, jobs, onNavi
           <BulletSection title="Qualifications & Experience" content={job.requirements} />
 
           {/* Benefits */}
-          <BulletSection title="Benefits & Perks" content={job.benefits} />
+          <BulletSection title={job.benefitsTitle?.trim() || 'Benefits & Perks'} content={job.benefits} />
         </div>
 
         {/* Sidebar Info Summary */}

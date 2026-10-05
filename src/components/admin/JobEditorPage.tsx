@@ -133,6 +133,7 @@ export const JobEditorPage: React.FC<JobEditorPageProps> = ({
   const [responsibilities, setResponsibilities] = useState('');
   const [requirements, setRequirements] = useState('');
   const [benefits, setBenefits] = useState('');
+  const [benefitsTitle, setBenefitsTitle] = useState('Benefits & Perks');
   const [applicationUrl, setApplicationUrl] = useState('');
   const [applicationDeadline, setApplicationDeadline] = useState('');
   const [tags, setTags] = useState<string[]>([]);
@@ -166,6 +167,7 @@ export const JobEditorPage: React.FC<JobEditorPageProps> = ({
       setResponsibilities(initialJob.responsibilities || '');
       setRequirements(initialJob.requirements || '');
       setBenefits(initialJob.benefits || '');
+      setBenefitsTitle(initialJob.benefitsTitle || 'Benefits & Perks');
       setApplicationUrl(initialJob.applicationUrl || '');
       setApplicationDeadline(initialJob.applicationDeadline || '');
       setTags(initialJob.tags || []);
@@ -206,6 +208,7 @@ export const JobEditorPage: React.FC<JobEditorPageProps> = ({
     setResponsibilities('');
     setRequirements('');
     setBenefits('');
+    setBenefitsTitle('Benefits & Perks');
     setApplicationUrl('');
     setApplicationDeadline('');
     setTags([]);
@@ -314,6 +317,7 @@ export const JobEditorPage: React.FC<JobEditorPageProps> = ({
       responsibilities: responsibilities.trim(),
       requirements: requirements.trim(),
       benefits: benefits.trim() || undefined,
+      benefitsTitle: benefitsTitle.trim() || 'Benefits & Perks',
       applicationUrl: applicationUrl.trim(),
       applicationDeadline: applicationDeadline || undefined,
       tags: getTagsToSave(),
@@ -661,7 +665,18 @@ export const JobEditorPage: React.FC<JobEditorPageProps> = ({
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                    Benefits &amp; Perks (Optional)
+                    Benefits section heading
+                  </label>
+                  <input
+                    type="text"
+                    value={benefitsTitle}
+                    onChange={(e) => setBenefitsTitle(e.target.value)}
+                    placeholder="Benefits & Perks"
+                    aria-label="Benefits section heading"
+                    className="mb-3 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2.5 text-sm text-slate-900 focus:bg-white focus:border-indigo-500 focus:outline-none dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-100 dark:focus:bg-slate-900"
+                  />
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                    Benefits details (optional)
                   </label>
                   <AutoResizeTextarea
                     minRows={3}

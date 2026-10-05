@@ -357,6 +357,7 @@ CREATE TRIGGER enforce_admin_user_mfa_for_mutations
   EXECUTE FUNCTION public.enforce_admin_user_mfa_for_mutations();
 
 DROP POLICY IF EXISTS "Active administrators can read admin_users" ON public.admin_users;
+DROP POLICY IF EXISTS "Admins can read permitted admin profiles" ON public.admin_users;
 CREATE POLICY "Admins can read permitted admin profiles"
   ON public.admin_users
   FOR SELECT

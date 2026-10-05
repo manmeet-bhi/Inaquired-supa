@@ -70,6 +70,7 @@ export const PostAJobPage: React.FC<PostAJobPageProps> = ({ onNavigate }) => {
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [stagingWarning, setStagingWarning] = useState<string | null>(null);
 
   const encodeFormData = (data: Record<string, string>) => {
     return Object.keys(data)
@@ -143,7 +144,7 @@ export const PostAJobPage: React.FC<PostAJobPageProps> = ({ onNavigate }) => {
 
     // 1. Submit to Netlify Forms
     try {
-      await fetch('/', {
+      const response = await fetch('/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: encodeFormData({
@@ -171,8 +172,14 @@ export const PostAJobPage: React.FC<PostAJobPageProps> = ({ onNavigate }) => {
           benefits: formData.benefits.trim(),
         }),
       });
+      if (!response.ok) {
+        throw new Error(`Netlify rejected the job submission (${response.status}).`);
+      }
     } catch (err) {
-      console.warn('Netlify form post notice:', err);
+      console.error('Netlify job form submission failed:', err);
+      setError('We could not send your job listing. Please try again in a moment.');
+      setLoading(false);
+      return;
     }
 
     // 2. Stage into Supabase jobs table as draft for 24-hr review
@@ -204,8 +211,9 @@ export const PostAJobPage: React.FC<PostAJobPageProps> = ({ onNavigate }) => {
       };
 
       await createJob(jobPayload);
-    } catch (err: any) {
-      console.warn('Supabase job draft staging notice:', err?.message || err);
+    } catch (err) {
+      console.error('Supabase job draft staging failed:', err);
+      setStagingWarning('Your form was received, but we could not save the draft for review. Please contact support and include your company and job title.');
     }
 
     setLoading(false);
@@ -255,6 +263,11 @@ export const PostAJobPage: React.FC<PostAJobPageProps> = ({ onNavigate }) => {
             <p className="text-xs text-slate-500 dark:text-slate-400">
               A review confirmation will be logged for <strong>{formData.employerEmail}</strong>.
             </p>
+            {stagingWarning && (
+              <p role="alert" className="mx-auto max-w-md rounded-lg bg-amber-50 p-3 text-xs text-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+                {stagingWarning}
+              </p>
+            )}
 
             <div className="pt-4 flex flex-wrap items-center justify-center gap-3">
               <button
@@ -266,6 +279,8 @@ export const PostAJobPage: React.FC<PostAJobPageProps> = ({ onNavigate }) => {
               <button
                 onClick={() => {
                   setSubmitted(false);
+                  setStagingWarning(null);
+                  setError(null);
                   setFormData({
                     ...formData,
                     title: '',

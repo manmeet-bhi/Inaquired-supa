@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS public.jobs (
   responsibilities TEXT NOT NULL,
   requirements TEXT NOT NULL,
   benefits TEXT,
+  benefits_title TEXT,
   application_url TEXT NOT NULL,
   application_deadline DATE,
   tags TEXT[] DEFAULT '{}',

@@ -45,7 +45,7 @@ export const ContactPage: React.FC<ContactPageProps> = ({ onNavigate }) => {
 
     setLoading(true);
     try {
-      await fetch('/', {
+      const response = await fetch('/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: encodeFormData({
@@ -57,11 +57,13 @@ export const ContactPage: React.FC<ContactPageProps> = ({ onNavigate }) => {
           message: formData.message.trim(),
         }),
       });
+      if (!response.ok) {
+        throw new Error(`Netlify rejected the contact submission (${response.status}).`);
+      }
       setSubmitted(true);
-    } catch (err: any) {
-      console.warn('Netlify form submission notice:', err);
-      // Ensure smooth user experience even in local preview environments
-      setSubmitted(true);
+    } catch (err) {
+      console.error('Netlify contact form submission failed:', err);
+      setError('We could not send your message. Please try again in a moment.');
     } finally {
       setLoading(false);
     }

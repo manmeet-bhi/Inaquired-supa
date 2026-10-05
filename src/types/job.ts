@@ -20,6 +20,7 @@ export interface Job {
   responsibilities: string;
   requirements: string;
   benefits?: string;
+  benefitsTitle?: string;
   applicationUrl: string;
   applicationDeadline?: string;
   tags: string[];
