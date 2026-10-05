@@ -14,9 +14,11 @@ import {
 import { JobIcon } from '../components/icons/JobIcon';
 import { Job, JobType, WorkArrangement, ExperienceLevel } from '../types/job';
 import { createJob } from '../services/jobService';
+import { Category } from '../services/categoryService';
 
 interface PostAJobPageProps {
   onNavigate: (path: string) => void;
+  categories: Category[];
 }
 
 const DEFAULT_CATEGORIES = [
@@ -40,7 +42,7 @@ const QUICK_TAG_SUGGESTIONS = [
   'Supabase', 'PostgreSQL', 'Tailwind', 'AI / ML', 'Full-Stack'
 ];
 
-export const PostAJobPage: React.FC<PostAJobPageProps> = ({ onNavigate }) => {
+export const PostAJobPage: React.FC<PostAJobPageProps> = ({ onNavigate, categories }) => {
   // Form state
   const [formData, setFormData] = useState({
     employerName: '',
@@ -71,6 +73,10 @@ export const PostAJobPage: React.FC<PostAJobPageProps> = ({ onNavigate }) => {
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [stagingWarning, setStagingWarning] = useState<string | null>(null);
+  const availableCategories = Array.from(new Set([
+    ...DEFAULT_CATEGORIES,
+    ...categories.map((category) => category.name),
+  ]));
 
   const encodeFormData = (data: Record<string, string>) => {
     return Object.keys(data)
@@ -436,7 +442,7 @@ export const PostAJobPage: React.FC<PostAJobPageProps> = ({ onNavigate }) => {
                     onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                     className="w-full rounded-lg border border-slate-200 bg-slate-50/50 py-2.5 px-3 text-sm text-slate-900 focus:border-indigo-500 focus:bg-white focus:outline-none dark:border-slate-700 dark:bg-slate-800/60 dark:text-white"
                   >
-                    {DEFAULT_CATEGORIES.map((cat) => (
+                    {availableCategories.map((cat) => (
                       <option key={cat} value={cat}>{cat}</option>
                     ))}
                   </select>

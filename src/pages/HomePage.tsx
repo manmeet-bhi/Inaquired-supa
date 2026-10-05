@@ -15,7 +15,6 @@ import {
   DollarSign,
   Settings,
   Users,
-  Headphones,
   ChevronLeft,
   ChevronRight
 } from 'lucide-react';
@@ -25,9 +24,11 @@ import { JobCard } from '../components/jobs/JobCard';
 import { JobFilters } from '../components/jobs/JobFilters';
 import { filterJobs } from '../utils/jobUtils';
 import { searchJobsInDatabase } from '../services/jobService';
+import { Category } from '../services/categoryService';
 
 interface HomePageProps {
   jobs: Job[];
+  categories: Category[];
   loading: boolean;
   onNavigate: (path: string) => void;
   onSelectJob: (slug: string) => void;
@@ -37,6 +38,7 @@ interface HomePageProps {
 
 export const HomePage: React.FC<HomePageProps> = ({ 
   jobs, 
+  categories: dashboardCategories,
   loading, 
   onNavigate, 
   onSelectJob,
@@ -105,7 +107,10 @@ export const HomePage: React.FC<HomePageProps> = ({
     return Array.from(map.values());
   }, [jobs, dbSearchResults, filters.keyword]);
 
-  const categories = Array.from(new Set(mergedJobs.map((j) => j.category).filter(Boolean)));
+  const categories = Array.from(new Set([
+    ...dashboardCategories.map((category) => category.name),
+    ...mergedJobs.map((job) => job.category).filter(Boolean),
+  ]));
   const filteredJobs = filterJobs(mergedJobs, filters);
   const totalPages = Math.ceil(filteredJobs.length / JOBS_PER_PAGE);
   const paginatedJobs = filteredJobs.slice((currentPage - 1) * JOBS_PER_PAGE, currentPage * JOBS_PER_PAGE);
@@ -122,6 +127,31 @@ export const HomePage: React.FC<HomePageProps> = ({
     .slice(0, 6);
   const internships = jobs.filter((j) => j.jobType === 'internship').slice(0, 3);
   const featuredJobs = jobs.filter((j) => j.featured).slice(0, 3);
+  const defaultDepartmentTiles = [
+    { name: 'Engineering', slug: 'engineering', icon: Code2, color: 'text-blue-500', bg: 'bg-blue-50 dark:bg-blue-950/40' },
+    { name: 'Design & Creative', slug: 'design', icon: Palette, color: 'text-pink-500', bg: 'bg-pink-50 dark:bg-pink-950/40' },
+    { name: 'Marketing & Growth', slug: 'marketing', icon: TrendingUp, color: 'text-emerald-500', bg: 'bg-emerald-50 dark:bg-emerald-950/40' },
+    { name: 'Data & Analytics', slug: 'data', icon: Database, color: 'text-violet-500', bg: 'bg-violet-50 dark:bg-violet-950/40' },
+    { name: 'Sales & Business Dev', slug: 'sales', icon: DollarSign, color: 'text-amber-500', bg: 'bg-amber-50 dark:bg-amber-950/40' },
+    { name: 'Operations', slug: 'operations', icon: Settings, color: 'text-slate-500', bg: 'bg-slate-100 dark:bg-slate-800/60' },
+  ];
+  const departmentTiles = [
+    ...defaultDepartmentTiles,
+    ...dashboardCategories
+      .filter((category) =>
+        category.slug !== 'customer-success-support' &&
+        category.slug !== 'customer-support' &&
+        !defaultDepartmentTiles.some((department) => department.slug === category.slug)
+      )
+      .map((category) => ({
+        name: category.name,
+        slug: category.slug,
+        icon: JobIcon,
+        color: 'text-indigo-500',
+        bg: 'bg-indigo-50 dark:bg-indigo-950/40',
+      })),
+  ];
+  const visibleDepartmentTiles = departmentTiles.slice(0, 8);
 
   const handleQuickArrangement = (arrangement: string) => {
     setFilters((prev) => ({ ...prev, workArrangement: arrangement }));
@@ -363,15 +393,7 @@ export const HomePage: React.FC<HomePageProps> = ({
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-          {[
-            { name: 'Engineering', slug: 'engineering', icon: Code2, color: 'text-blue-500', bg: 'bg-blue-50 dark:bg-blue-950/40' },
-            { name: 'Design & Creative', slug: 'design', icon: Palette, color: 'text-pink-500', bg: 'bg-pink-50 dark:bg-pink-950/40' },
-            { name: 'Marketing & Growth', slug: 'marketing', icon: TrendingUp, color: 'text-emerald-500', bg: 'bg-emerald-50 dark:bg-emerald-950/40' },
-            { name: 'Data & Analytics', slug: 'data', icon: Database, color: 'text-violet-500', bg: 'bg-violet-50 dark:bg-violet-950/40' },
-            { name: 'Sales & Business Dev', slug: 'sales', icon: DollarSign, color: 'text-amber-500', bg: 'bg-amber-50 dark:bg-amber-950/40' },
-            { name: 'Operations', slug: 'operations', icon: Settings, color: 'text-slate-500', bg: 'bg-slate-100 dark:bg-slate-800/60' },
-            { name: 'Customer Success', slug: 'customer-support', icon: Headphones, color: 'text-cyan-500', bg: 'bg-cyan-50 dark:bg-cyan-950/40' },
-          ].map((dept) => {
+          {visibleDepartmentTiles.map((dept) => {
             const Icon = dept.icon;
             const deptJobCount = jobs.filter(j => 
               (j.category || '').toLowerCase().includes(dept.slug) ||
@@ -401,7 +423,7 @@ export const HomePage: React.FC<HomePageProps> = ({
             onClick={() => onNavigate('/departments')}
             className="group flex items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-white p-4 text-xs font-semibold text-slate-600 hover:border-indigo-400 hover:text-indigo-600 dark:border-slate-700 dark:bg-slate-900/50 dark:text-slate-400 dark:hover:border-indigo-600 dark:hover:text-indigo-400 transition-all duration-200"
           >
-            <span>More</span>
+            <span>More departments</span>
             <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
           </button>
         </div>

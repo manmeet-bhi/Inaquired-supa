@@ -168,14 +168,18 @@ export const CompaniesPage: React.FC<CompaniesPageProps> = ({
                   }}
                   className="group relative flex cursor-pointer flex-col justify-between overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-indigo-400 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 dark:border-slate-800 dark:bg-slate-900/90 dark:hover:border-indigo-600/70 dark:focus-visible:ring-offset-slate-950"
                 >
-                  <Building2
+                  <div
                     aria-hidden="true"
-                    className="pointer-events-none absolute -right-3 -top-4 h-32 w-32 text-indigo-500/[0.07] transition-transform duration-300 group-hover:scale-110 dark:text-indigo-300/[0.08]"
+                    className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-indigo-400/70 to-transparent dark:via-indigo-400/50"
                   />
                   <div className="relative z-10">
-                    <h3 className="text-base font-bold text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                    <h3 className="text-lg font-bold text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
                       {company.name}
                     </h3>
+                    <div
+                      aria-hidden="true"
+                      className="mt-2 h-0.5 w-10 rounded-full bg-gradient-to-r from-indigo-500 to-blue-400"
+                    />
                     {recentJob && (
                       <div className="mt-4 space-y-1.5 border-t border-slate-100 dark:border-slate-800/80 pt-3">
                         <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">

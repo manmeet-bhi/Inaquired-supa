@@ -18,6 +18,34 @@
   }
 }
 
+:is(:root.dark, [data-theme="dark"]) :is(
+  input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]),
+  select,
+  textarea
+) {
+  background-color: #1e293b !important;
+  color: #f1f5f9 !important;
+  color-scheme: dark;
+}
+
+:is(:root.dark, [data-theme="dark"]) :is(input, textarea)::placeholder {
+  color: #94a3b8 !important;
+  opacity: 1;
+}
+
+:is(:root.dark, [data-theme="dark"]) select option,
+:is(:root.dark, [data-theme="dark"]) select optgroup {
+  background-color: #0f172a !important;
+  color: #e2e8f0 !important;
+}
+
+:is(:root.dark, [data-theme="dark"]) input:-webkit-autofill,
+:is(:root.dark, [data-theme="dark"]) input:-webkit-autofill:hover,
+:is(:root.dark, [data-theme="dark"]) input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #f1f5f9 !important;
+  box-shadow: 0 0 0 1000px #1e293b inset !important;
+}
+
 /* Custom smooth transition for theme change */
 *, *::before, *::after {
   transition-property: background-color, border-color, color, fill, stroke;
@@ -71,12 +99,3 @@
 [data-theme='dark'] .scrollbar-thin {
   scrollbar-color: rgba(71, 85, 105, 0.5) transparent;
 }
-
-.dark form[name='contact'] :is(input, select, textarea):focus,
-.dark form[name='post-a-job'] :is(input, select, textarea):focus,
-[data-theme='dark'] form[name='contact'] :is(input, select, textarea):focus,
-[data-theme='dark'] form[name='post-a-job'] :is(input, select, textarea):focus {
-  background-color: rgb(30 41 59 / 0.6);
-  color: #fff;
-}
-

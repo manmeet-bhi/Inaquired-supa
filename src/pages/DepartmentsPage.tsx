@@ -8,7 +8,14 @@ import {
   DollarSign, 
   Settings, 
   Users, 
-  Headphones, 
+  Headphones,
+  Wallet,
+  ClipboardList,
+  Landmark,
+  Factory,
+  Clapperboard,
+  ShoppingBag,
+  Truck,
   Layers, 
   ArrowRight, 
   Search,
@@ -16,12 +23,13 @@ import {
   ChevronLeft,
   ChevronRight
 } from 'lucide-react';
-import { JobIcon } from '../components/icons/JobIcon';
 import { Job } from '../types/job';
 import { sortJobsByNewest } from '../utils/jobUtils';
+import { Category } from '../services/categoryService';
 
 interface DepartmentsPageProps {
   jobs: Job[];
+  categories: Category[];
   onNavigate: (path: string) => void;
   onSelectJob: (slug: string) => void;
 }
@@ -32,6 +40,29 @@ interface DepartmentDef {
   description: string;
   icon: React.ComponentType<{ className?: string }>;
 }
+
+const getDepartmentIcon = (name: string, slug: string): DepartmentDef['icon'] => {
+  const department = `${name} ${slug}`.toLowerCase();
+
+  if (/engineer|develop|software|technology|\bit\b/.test(department)) return Code2;
+  if (/design|creative|art/.test(department)) return Palette;
+  if (/product/.test(department)) return Sparkles;
+  if (/data|analytic|ai|research/.test(department)) return Database;
+  if (/media|entertain/.test(department)) return Clapperboard;
+  if (/market|growth/.test(department)) return TrendingUp;
+  if (/sales|business develop|partnership/.test(department)) return DollarSign;
+  if (/operation|strategy|administrat|office support/.test(department)) return Settings;
+  if (/people|human resource|hr|recruit|talent/.test(department)) return Users;
+  if (/customer|support|service/.test(department)) return Headphones;
+  if (/finance|account|bank/.test(department)) return Wallet;
+  if (/government|public sector/.test(department)) return Landmark;
+  if (/manufactur|production/.test(department)) return Factory;
+  if (/retail|e-commerce|ecommerce/.test(department)) return ShoppingBag;
+  if (/supply chain|logistic/.test(department)) return Truck;
+  if (/security|compliance|legal/.test(department)) return ClipboardList;
+
+  return Layers;
+};
 
 const DEFAULT_DEPARTMENTS: DepartmentDef[] = [
   {
@@ -77,12 +108,6 @@ const DEFAULT_DEPARTMENTS: DepartmentDef[] = [
     icon: Settings,
   },
   {
-    name: 'Customer Success',
-    slug: 'customer-support',
-    description: 'Technical support specialists, customer onboarding, and client account managers.',
-    icon: Headphones,
-  },
-  {
     name: 'People & HR',
     slug: 'human-resources',
     description: 'Talent acquisition, technical recruiting, people operations, and employee experience.',
@@ -92,6 +117,7 @@ const DEFAULT_DEPARTMENTS: DepartmentDef[] = [
 
 export const DepartmentsPage: React.FC<DepartmentsPageProps> = ({
   jobs,
+  categories,
   onNavigate,
   onSelectJob,
 }) => {
@@ -104,17 +130,38 @@ export const DepartmentsPage: React.FC<DepartmentsPageProps> = ({
   const jobCategories = Array.from(new Set(jobs.map((j) => (j.category || '').trim()).filter(Boolean)));
 
   // Merge default departments with any custom categories present in jobs
-  const allDepartments: DepartmentDef[] = [...DEFAULT_DEPARTMENTS];
+  const allDepartments: DepartmentDef[] = [];
+
+  categories.forEach((category) => {
+    if (category.slug === 'customer-success-support' || category.slug === 'customer-support') return;
+    allDepartments.push({
+      name: category.name,
+      slug: category.slug,
+      description: category.description || `Explore verified opportunities and openings in ${category.name}.`,
+      icon: getDepartmentIcon(category.name, category.slug),
+    });
+  });
+
+  DEFAULT_DEPARTMENTS.forEach((department) => {
+    const exists = allDepartments.some((existing) =>
+      existing.slug === department.slug ||
+      existing.name.toLowerCase() === department.name.toLowerCase()
+    );
+    if (!exists) {
+      allDepartments.push(department);
+    }
+  });
 
   jobCategories.forEach((catName) => {
     const slug = catName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    if (slug === 'customer-success-support' || slug === 'customer-support') return;
     const exists = allDepartments.some((d) => d.slug === slug || d.name.toLowerCase() === catName.toLowerCase());
     if (!exists) {
       allDepartments.push({
         name: catName,
         slug,
         description: `Explore verified opportunities and openings in ${catName}.`,
-        icon: JobIcon,
+        icon: getDepartmentIcon(catName, slug),
       });
     }
   });

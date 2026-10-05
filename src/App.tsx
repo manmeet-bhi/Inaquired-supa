@@ -5,6 +5,7 @@ import { Footer } from './components/layout/Footer';
 import { CookieBanner } from './components/layout/CookieBanner';
 import { Job } from './types/job';
 import { subscribeToPublicJobs } from './services/jobService';
+import { Category, subscribeToCategories } from './services/categoryService';
 import { triggerJobNotification } from './services/notificationService';
 import { applyRouteSEO } from './utils/seoManager';
 
@@ -41,6 +42,7 @@ function MainApp() {
   });
 
   const [jobs, setJobs] = useState<Job[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loadingJobs, setLoadingJobs] = useState<boolean>(true);
   const [searchKeyword, setSearchKeyword] = useState<string>('');
   const previousJobIdsRef = useRef<Set<string> | null>(null);
@@ -104,6 +106,8 @@ function MainApp() {
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
+
+  useEffect(() => subscribeToCategories(setCategories), []);
 
   // Apply per-page title & meta on every route change
   useEffect(() => {
@@ -177,6 +181,7 @@ function MainApp() {
           pageType="category"
           categorySlug={slug}
           jobs={jobs}
+          categories={categories}
           loading={loadingJobs}
           onNavigate={navigate}
           onSelectJob={handleSelectJob}
@@ -191,6 +196,7 @@ function MainApp() {
         <CategoryJobsPage
           pageType="all"
           jobs={jobs}
+          categories={categories}
           loading={loadingJobs}
           onNavigate={navigate}
           onSelectJob={handleSelectJob}
@@ -205,6 +211,7 @@ function MainApp() {
         <CategoryJobsPage
           pageType="remote"
           jobs={jobs}
+          categories={categories}
           loading={loadingJobs}
           onNavigate={navigate}
           onSelectJob={handleSelectJob}
@@ -219,6 +226,7 @@ function MainApp() {
         <CategoryJobsPage
           pageType="onsite"
           jobs={jobs}
+          categories={categories}
           loading={loadingJobs}
           onNavigate={navigate}
           onSelectJob={handleSelectJob}
@@ -233,6 +241,7 @@ function MainApp() {
         <CategoryJobsPage
           pageType="hybrid"
           jobs={jobs}
+          categories={categories}
           loading={loadingJobs}
           onNavigate={navigate}
           onSelectJob={handleSelectJob}
@@ -247,6 +256,7 @@ function MainApp() {
         <CategoryJobsPage
           pageType="internship"
           jobs={jobs}
+          categories={categories}
           loading={loadingJobs}
           onNavigate={navigate}
           onSelectJob={handleSelectJob}
@@ -260,6 +270,7 @@ function MainApp() {
       return (
         <DepartmentsPage
           jobs={jobs}
+          categories={categories}
           onNavigate={navigate}
           onSelectJob={handleSelectJob}
         />
@@ -283,6 +294,7 @@ function MainApp() {
           pageType="company"
           companyName={companyParam}
           jobs={jobs}
+          categories={categories}
           loading={loadingJobs}
           onNavigate={navigate}
           onSelectJob={handleSelectJob}
@@ -301,7 +313,7 @@ function MainApp() {
     }
 
     if (currentPath === '/post-a-job' || currentPath === '/post-job') {
-      return <PostAJobPage onNavigate={navigate} />;
+      return <PostAJobPage onNavigate={navigate} categories={categories} />;
     }
 
     if (currentPath === '/privacy') {
@@ -320,6 +332,7 @@ function MainApp() {
       return (
         <HomePage
           jobs={jobs}
+          categories={categories}
           loading={loadingJobs}
           onNavigate={navigate}
           onSelectJob={handleSelectJob}

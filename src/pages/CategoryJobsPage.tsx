@@ -4,12 +4,14 @@ import { Job, JobFiltersState } from '../types/job';
 import { JobCard } from '../components/jobs/JobCard';
 import { JobFilters } from '../components/jobs/JobFilters';
 import { filterJobs } from '../utils/jobUtils';
+import { Category } from '../services/categoryService';
 
 interface CategoryJobsPageProps {
   pageType: 'remote' | 'onsite' | 'hybrid' | 'internship' | 'all' | 'category' | 'company';
   categorySlug?: string;
   companyName?: string;
   jobs: Job[];
+  categories: Category[];
   loading: boolean;
   onNavigate: (path: string) => void;
   onSelectJob: (slug: string) => void;
@@ -22,6 +24,7 @@ export const CategoryJobsPage: React.FC<CategoryJobsPageProps> = ({
   categorySlug = '',
   companyName = '',
   jobs,
+  categories,
   loading,
   onNavigate,
   onSelectJob,
@@ -29,7 +32,8 @@ export const CategoryJobsPage: React.FC<CategoryJobsPageProps> = ({
   onKeywordChange
 }) => {
   const matchingCategory = categorySlug
-    ? jobs.find((j) => (j.category || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') === categorySlug)?.category ||
+    ? categories.find((category) => category.slug === categorySlug)?.name ||
+      jobs.find((j) => (j.category || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') === categorySlug)?.category ||
       categorySlug.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
     : 'all';
 
@@ -116,7 +120,10 @@ export const CategoryJobsPage: React.FC<CategoryJobsPageProps> = ({
   };
 
   const meta = getPageMeta();
-  const categories = Array.from(new Set(jobs.map((j) => j.category).filter(Boolean)));
+  const availableCategories = Array.from(new Set([
+    ...categories.map((category) => category.name),
+    ...jobs.map((job) => job.category).filter(Boolean),
+  ]));
   const scopedJobs = pageType === 'company' && companyName 
     ? jobs.filter((j) => (j.companyName || '').toLowerCase() === companyName.toLowerCase())
     : jobs;
@@ -157,7 +164,7 @@ export const CategoryJobsPage: React.FC<CategoryJobsPageProps> = ({
       <JobFilters
         filters={filters}
         onFilterChange={handleFilterUpdate}
-        availableCategories={categories}
+        availableCategories={availableCategories}
         totalResults={filtered.length}
       />
 

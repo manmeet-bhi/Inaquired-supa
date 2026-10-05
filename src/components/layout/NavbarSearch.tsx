@@ -145,7 +145,7 @@ export const NavbarSearch: React.FC<NavbarSearchProps> = ({
   };
 
   return (
-    <div ref={containerRef} className="relative w-full max-w-xs lg:max-w-sm">
+    <div ref={containerRef} className="relative w-full min-w-0">
       <div className="relative flex items-center">
         <Search className="pointer-events-none absolute left-3 h-4 w-4 text-slate-400 dark:text-slate-500" />
         <input
@@ -158,7 +158,7 @@ export const NavbarSearch: React.FC<NavbarSearchProps> = ({
           }}
           onKeyDown={handleKeyDown}
           placeholder="Filter by title or company..."
-          className="w-full rounded-lg border border-slate-200 bg-slate-50/80 py-1.5 pl-9 pr-8 text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-slate-800 dark:bg-slate-800/80 dark:text-white dark:placeholder:text-slate-500 dark:focus:bg-slate-900 transition-all"
+          className="w-full min-w-0 rounded-lg border border-slate-200 bg-slate-50/80 py-2.5 pl-9 pr-8 text-base sm:py-1.5 sm:text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-slate-800 dark:bg-slate-800/80 dark:text-white dark:placeholder:text-slate-500 dark:focus:bg-slate-900 transition-all"
           aria-label="Global search for jobs by title or company"
           aria-expanded={isOpen}
           role="combobox"

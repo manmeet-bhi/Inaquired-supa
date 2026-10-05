@@ -6,9 +6,7 @@ import {
   X,
   Search,
   ChevronDown,
-  Building2,
 } from 'lucide-react';
-import { JobIcon } from '../icons/JobIcon';
 import { useTheme } from '../../context/ThemeContext';
 import { NavbarSearch } from './NavbarSearch';
 import { Job } from '../../types/job';
@@ -219,12 +217,17 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Mobile Search Toggle Button */}
           <button
             type="button"
-            onClick={() => setMobileSearchOpen(!mobileSearchOpen)}
-            className="md:hidden p-2 rounded-lg border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-800/80 dark:text-slate-300 dark:hover:bg-slate-800 transition-colors"
+            onClick={() => {
+              setMobileSearchOpen((open) => !open);
+              setMobileMenuOpen(false);
+            }}
+            className="md:hidden p-2.5 rounded-lg border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-800/80 dark:text-slate-300 dark:hover:bg-slate-800 transition-colors"
             title="Search jobs"
             aria-label="Search jobs"
+            aria-expanded={mobileSearchOpen}
+            aria-controls="mobile-search"
           >
-            <Search className="h-4 w-4" />
+            {mobileSearchOpen ? <X className="h-5 w-5" /> : <Search className="h-5 w-5" />}
           </button>
 
           {/* Modern Theme Toggle Switch */}
@@ -270,9 +273,14 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           {/* Mobile Menu Hamburger */}
           <button
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="lg:hidden p-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800 cursor-pointer"
-            aria-label="Open navigation menu"
+            onClick={() => {
+              setMobileMenuOpen((open) => !open);
+              setMobileSearchOpen(false);
+            }}
+            className="lg:hidden p-2.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800 cursor-pointer"
+            aria-label={mobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
+            aria-expanded={mobileMenuOpen}
+            aria-controls="mobile-navigation"
           >
             {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
@@ -281,7 +289,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
       {/* Mobile Search Dropdown Bar */}
       {mobileSearchOpen && (
-        <div className="md:hidden border-t border-slate-200 bg-slate-50 px-4 py-2.5 dark:border-slate-800 dark:bg-slate-900/95">
+        <div id="mobile-search" className="md:hidden border-t border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-900/95">
           <NavbarSearch
             jobs={jobs}
             keyword={globalKeyword}
@@ -297,7 +305,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
       {/* Mobile Menu Drawer */}
       {mobileMenuOpen && (
-        <div className="lg:hidden border-b border-slate-200 bg-white px-4 pt-3 pb-6 dark:border-slate-800 dark:bg-slate-900 shadow-xl space-y-4">
+        <div id="mobile-navigation" className="lg:hidden border-b border-slate-200 bg-white px-4 pt-3 pb-6 dark:border-slate-800 dark:bg-slate-900 shadow-xl space-y-4">
           <div className="md:hidden pb-1">
             <NavbarSearch
               jobs={jobs}
@@ -324,7 +332,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     <button
                       key={item.path}
                       onClick={() => handleNavClick(item.path)}
-                      className={`flex items-center gap-2.5 w-full text-left px-3 py-2 text-sm font-semibold rounded-lg transition-colors cursor-pointer ${isActive
+                      className={`flex min-h-11 items-center gap-2.5 w-full text-left px-3 py-2 text-base font-semibold rounded-lg transition-colors cursor-pointer ${isActive
                           ? 'text-indigo-600 bg-indigo-50 dark:text-indigo-300 dark:bg-indigo-950 font-bold'
                           : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
                         }`}
@@ -339,7 +347,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <div className="border-t border-slate-100 dark:border-slate-800 pt-2 space-y-1">
               <button
                 onClick={() => handleNavClick('/about')}
-                className={`block w-full text-left px-3 py-2 text-sm font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/about'
+                className={`block w-full min-h-11 text-left px-3 py-2 text-base font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/about'
                     ? 'text-indigo-600 bg-indigo-50 dark:text-indigo-300 dark:bg-indigo-950'
                     : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
                   }`}
@@ -348,7 +356,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               </button>
               <button
                 onClick={() => handleNavClick('/contact')}
-                className={`block w-full text-left px-3 py-2 text-sm font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/contact'
+                className={`block w-full min-h-11 text-left px-3 py-2 text-base font-semibold rounded-lg transition-colors cursor-pointer ${currentPath === '/contact'
                     ? 'text-indigo-600 bg-indigo-50 dark:text-indigo-300 dark:bg-indigo-950'
                     : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
                   }`}
@@ -356,21 +364,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                 Contact
               </button>
 
-              <button
-                onClick={() => handleNavClick('/post-a-job')}
-                className={`flex items-center justify-between w-full text-left px-3 py-2.5 text-sm font-bold rounded-lg transition-colors cursor-pointer ${currentPath === '/post-a-job'
-                    ? 'text-white bg-indigo-600 shadow-xs'
-                    : 'text-indigo-700 bg-indigo-50/80 hover:bg-indigo-100 dark:bg-indigo-950/70 dark:text-indigo-300'
-                  }`}
-              >
-                <div className="flex items-center gap-2">
-                  <JobIcon className="h-4 w-4" />
-                  <span>Post a Job (Employers)</span>
-                </div>
-                <span className="rounded-full bg-indigo-200/80 dark:bg-indigo-900 px-2 py-0.5 text-[10px] font-bold">
-                  Live in 24h
-                </span>
-              </button>
             </div>
           </div>
         </div>
