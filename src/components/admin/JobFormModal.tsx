@@ -28,6 +28,7 @@ interface JobFormModalProps {
   onSubmit: (jobData: Omit<Job, 'id'>, jobId?: string) => Promise<void>;
   initialJob?: Job | null;
   categoriesList?: string[];
+  availableTags?: string[];
 }
 
 const DEFAULT_CATEGORIES = [
@@ -58,7 +59,8 @@ export const JobFormModal: React.FC<JobFormModalProps> = ({
   onClose,
   onSubmit,
   initialJob,
-  categoriesList
+  categoriesList,
+  availableTags = []
 }) => {
   const isEditing = Boolean(initialJob);
   const categoriesToUse = categoriesList && categoriesList.length > 0 ? categoriesList : DEFAULT_CATEGORIES;
@@ -120,7 +122,7 @@ export const JobFormModal: React.FC<JobFormModalProps> = ({
     }
     setActiveTab('basics');
     setErrorMessage(null);
-  }, [initialJob, isOpen]);
+  }, [initialJob?.id, isOpen]);
 
   // Auto-generate slug when title or company changes (only when creating)
   useEffect(() => {
@@ -183,21 +185,36 @@ export const JobFormModal: React.FC<JobFormModalProps> = ({
     setTags(tags.filter(t => t !== tagToRemove));
   };
 
+  const getTagsToSave = () => {
+    const tagsToSave = [...tags];
+    const knownTags = new Set(tagsToSave.map((tag) => tag.toLocaleLowerCase()));
+    currentTagInput.split(',').forEach((tag) => {
+      const trimmedTag = tag.trim();
+      const normalizedTag = trimmedTag.toLocaleLowerCase();
+      if (normalizedTag && !knownTags.has(normalizedTag)) {
+        tagsToSave.push(trimmedTag);
+        knownTags.add(normalizedTag);
+      }
+    });
+    return tagsToSave;
+  };
+
   const handleTagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' || e.key === ',') {
+    if (e.key === 'Enter') {
       e.preventDefault();
       handleAddTag();
     }
   };
 
   const tagSearchQuery = currentTagInput.split(',').pop()?.trim() || '';
-  const hasMinimumTagSearchLength = tagSearchQuery.replace(/[^a-z]/gi, '').length >= 3;
-  const matchingTagSuggestions = hasMinimumTagSearchLength
-    ? QUICK_TAG_SUGGESTIONS.filter((suggestion) =>
-        suggestion.toLocaleLowerCase().includes(tagSearchQuery.toLocaleLowerCase()) &&
-        !tags.some((tag) => tag.toLocaleLowerCase() === suggestion.toLocaleLowerCase())
-      )
-    : [];
+  const knownTags = Array.from(new Set([...availableTags, ...QUICK_TAG_SUGGESTIONS]));
+  const matchingTagSuggestions = knownTags
+    .filter((suggestion) =>
+      (!tagSearchQuery || suggestion.toLocaleLowerCase().includes(tagSearchQuery.toLocaleLowerCase())) &&
+      !tags.some((tag) => tag.toLocaleLowerCase() === suggestion.toLocaleLowerCase())
+    )
+    .slice(0, 8);
+  const hasTagSearchQuery = Boolean(tagSearchQuery);
 
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -239,7 +256,7 @@ export const JobFormModal: React.FC<JobFormModalProps> = ({
       benefits: benefits.trim() || undefined,
       applicationUrl: applicationUrl.trim(),
       applicationDeadline: applicationDeadline || undefined,
-      tags,
+      tags: getTagsToSave(),
       status,
       featured,
       createdAt: initialJob?.createdAt || new Date().toISOString(),
@@ -640,7 +657,7 @@ export const JobFormModal: React.FC<JobFormModalProps> = ({
                       onChange={(e) => setCurrentTagInput(e.target.value)}
                       onKeyDown={handleTagKeyDown}
                       aria-label="Search or add skills and tags"
-                      placeholder="Search skills (3+ letters) or add comma-separated tags"
+                      placeholder="Search saved tags or enter comma-separated tags"
                       className="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-2 pl-8 pr-3 text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-indigo-500 focus:outline-none dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-100"
                     />
                   </div>
@@ -653,7 +670,7 @@ export const JobFormModal: React.FC<JobFormModalProps> = ({
                   </button>
                 </div>
 
-                {hasMinimumTagSearchLength ? (
+                {hasTagSearchQuery ? (
                   <div className="flex flex-wrap gap-1.5 items-center pb-2" aria-live="polite">
                     {matchingTagSuggestions.length > 0 ? (
                       matchingTagSuggestions.map((suggested) => (
@@ -672,8 +689,8 @@ export const JobFormModal: React.FC<JobFormModalProps> = ({
                   </div>
                 ) : (
                   <div className="flex flex-wrap gap-1.5 items-center pb-2">
-                    <span className="text-[11px] text-slate-400 mr-1">Quick add:</span>
-                    {QUICK_TAG_SUGGESTIONS.filter(t => !tags.some(tag => tag.toLocaleLowerCase() === t.toLocaleLowerCase())).slice(0, 6).map((suggested) => (
+                    <span className="text-[11px] text-slate-400 mr-1">Saved tags:</span>
+                    {matchingTagSuggestions.slice(0, 6).map((suggested) => (
                       <button
                         key={suggested}
                         type="button"

@@ -932,6 +932,19 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
     ];
   }, [categories]);
 
+  const availableJobTags = useMemo(() => {
+    const tagsByNormalizedName = new Map<string, string>();
+    jobs.forEach((job) => {
+      (job.tags || []).forEach((tag) => {
+        const normalizedTag = tag.trim().toLocaleLowerCase();
+        if (normalizedTag && !tagsByNormalizedName.has(normalizedTag)) {
+          tagsByNormalizedName.set(normalizedTag, tag.trim());
+        }
+      });
+    });
+    return Array.from(tagsByNormalizedName.values());
+  }, [jobs]);
+
   // Filtered Jobs
   const filteredJobs = useMemo(() => {
     return jobs.filter((job) => {
@@ -1265,11 +1278,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
           isSidebarCollapsed ? 'justify-center' : 'justify-between'
         }`}>
           <div className="flex items-center overflow-hidden">
-            <button 
-              onClick={() => onNavigate('/')}
-              className="flex items-center group shrink-0 cursor-pointer"
-              title="Return to public portal"
-            >
+            <div className="flex items-center group shrink-0" aria-label="inaquired">
               <img 
                 src={isSidebarCollapsed ? "/logo/logo-q.svg" : "/logo/logo.svg"} 
                 alt="inaquired" 
@@ -1277,7 +1286,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
                   isSidebarCollapsed ? "h-7 w-7" : "h-8 w-auto max-w-[130px]"
                 }`}
               />
-            </button>
+            </div>
           </div>
 
           {/* Desktop Collapse Toggle */}
@@ -1498,6 +1507,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
           <JobEditorPage
             initialJob={editingJob}
             categoriesList={availableCategoryNames}
+            availableTags={availableJobTags}
             onClose={() => {
               navigateToAdminPath('/admin/jobs');
             }}

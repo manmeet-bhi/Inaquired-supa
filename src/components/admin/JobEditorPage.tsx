@@ -23,6 +23,7 @@ import { Job, JobType, WorkArrangement, ExperienceLevel, JobStatus } from '../..
 interface JobEditorPageProps {
   initialJob?: Job | null;
   categoriesList?: string[];
+  availableTags?: string[];
   onClose: () => void;
   onSubmit: (jobData: Omit<Job, 'id'>, jobId?: string) => Promise<void>;
 }
@@ -108,6 +109,7 @@ const AutoResizeTextarea: React.FC<AutoResizeTextareaProps> = ({
 export const JobEditorPage: React.FC<JobEditorPageProps> = ({
   initialJob,
   categoriesList,
+  availableTags = [],
   onClose,
   onSubmit
 }) => {
@@ -173,7 +175,7 @@ export const JobEditorPage: React.FC<JobEditorPageProps> = ({
       resetForm();
     }
     setErrorMessage(null);
-  }, [initialJob]);
+  }, [initialJob?.id]);
 
   // Auto-generate slug when title or company changes (only when creating)
   useEffect(() => {
@@ -237,8 +239,22 @@ export const JobEditorPage: React.FC<JobEditorPageProps> = ({
     setTags(tags.filter(t => t !== tagToRemove));
   };
 
+  const getTagsToSave = () => {
+    const tagsToSave = [...tags];
+    const knownTags = new Set(tagsToSave.map((tag) => tag.toLocaleLowerCase()));
+    currentTagInput.split(',').forEach((tag) => {
+      const trimmedTag = tag.trim();
+      const normalizedTag = trimmedTag.toLocaleLowerCase();
+      if (normalizedTag && !knownTags.has(normalizedTag)) {
+        tagsToSave.push(trimmedTag);
+        knownTags.add(normalizedTag);
+      }
+    });
+    return tagsToSave;
+  };
+
   const handleTagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' || e.key === ',') {
+    if (e.key === 'Enter') {
       e.preventDefault();
       handleAddTag();
     }
@@ -300,7 +316,7 @@ export const JobEditorPage: React.FC<JobEditorPageProps> = ({
       benefits: benefits.trim() || undefined,
       applicationUrl: applicationUrl.trim(),
       applicationDeadline: applicationDeadline || undefined,
-      tags,
+      tags: getTagsToSave(),
       status: finalStatus,
       featured,
       createdAt: initialJob?.createdAt || new Date().toISOString(),
@@ -322,13 +338,14 @@ export const JobEditorPage: React.FC<JobEditorPageProps> = ({
   };
 
   const tagSearchQuery = currentTagInput.split(',').pop()?.trim() || '';
-  const hasMinimumTagSearchLength = tagSearchQuery.replace(/[^a-z]/gi, '').length >= 3;
-  const matchingTagSuggestions = hasMinimumTagSearchLength
-    ? QUICK_TAG_SUGGESTIONS.filter((suggestion) =>
-        suggestion.toLocaleLowerCase().includes(tagSearchQuery.toLocaleLowerCase()) &&
-        !tags.some((tag) => tag.toLocaleLowerCase() === suggestion.toLocaleLowerCase())
-      )
-    : [];
+  const knownTags = Array.from(new Set([...availableTags, ...QUICK_TAG_SUGGESTIONS]));
+  const matchingTagSuggestions = knownTags
+    .filter((suggestion) =>
+      (!tagSearchQuery || suggestion.toLocaleLowerCase().includes(tagSearchQuery.toLocaleLowerCase())) &&
+      !tags.some((tag) => tag.toLocaleLowerCase() === suggestion.toLocaleLowerCase())
+    )
+    .slice(0, 8);
+  const hasTagSearchQuery = Boolean(tagSearchQuery);
 
   return (
     <div className="min-h-screen bg-slate-50/50 dark:bg-slate-950 pb-16">
@@ -541,18 +558,6 @@ export const JobEditorPage: React.FC<JobEditorPageProps> = ({
                 </div>
               </div>
 
-              {/* Job Overview & Summary */}
-              <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Job Overview &amp; Summary (Optional)
-                </label>
-                <AutoResizeTextarea
-                  minRows={3}
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50/50 p-3.5 text-sm text-slate-900 focus:bg-white focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/10 dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-100 dark:focus:bg-slate-900 leading-relaxed transition-all"
-                />
-              </div>
             </section>
 
             {/* Card: Application Method */}
@@ -595,6 +600,26 @@ export const JobEditorPage: React.FC<JobEditorPageProps> = ({
                     />
                   </div>
                 </div>
+              </div>
+            </section>
+
+            {/* Card: Job Overview */}
+            <section className="rounded-2xl border border-slate-200 bg-white p-6 sm:p-7 dark:border-slate-800 dark:bg-slate-900 shadow-sm space-y-4">
+              <div className="border-b border-slate-100 dark:border-slate-800 pb-3">
+                <h2 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
+                  JOB OVERVIEW
+                </h2>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                  Job Overview &amp; Summary (Optional)
+                </label>
+                <AutoResizeTextarea
+                  minRows={3}
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50/50 p-3.5 text-sm text-slate-900 focus:bg-white focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/10 dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-100 dark:focus:bg-slate-900 leading-relaxed transition-all"
+                />
               </div>
             </section>
 
@@ -814,7 +839,7 @@ export const JobEditorPage: React.FC<JobEditorPageProps> = ({
                     onChange={(e) => setCurrentTagInput(e.target.value)}
                     onKeyDown={handleTagKeyDown}
                     aria-label="Search or add skills and tags"
-                    placeholder="Search skills (3+ letters) or add comma-separated tags"
+                    placeholder="Search saved tags or enter comma-separated tags"
                     className="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-2 pl-8 pr-3 text-xs sm:text-sm text-slate-900 focus:bg-white focus:border-indigo-500 focus:outline-none dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-100 dark:focus:bg-slate-900 transition-all"
                   />
                 </div>
@@ -827,7 +852,7 @@ export const JobEditorPage: React.FC<JobEditorPageProps> = ({
                 </button>
               </div>
 
-              {hasMinimumTagSearchLength ? (
+              {hasTagSearchQuery ? (
                 <div className="flex flex-wrap gap-1.5 items-center pt-1" aria-live="polite">
                   {matchingTagSuggestions.length > 0 ? (
                     matchingTagSuggestions.map((sugg) => (
@@ -846,8 +871,8 @@ export const JobEditorPage: React.FC<JobEditorPageProps> = ({
                 </div>
               ) : (
                 <div className="flex flex-wrap gap-1.5 items-center pt-1">
-                  <span className="text-[10px] text-slate-400 mr-1">Suggested:</span>
-                  {QUICK_TAG_SUGGESTIONS.filter(t => !tags.some(tag => tag.toLocaleLowerCase() === t.toLocaleLowerCase())).slice(0, 5).map((sugg) => (
+                  <span className="text-[10px] text-slate-400 mr-1">Saved tags:</span>
+                  {matchingTagSuggestions.slice(0, 5).map((sugg) => (
                     <button
                       key={sugg}
                       type="button"

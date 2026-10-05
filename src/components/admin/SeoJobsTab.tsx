@@ -204,10 +204,10 @@ export const SeoJobsTab: React.FC<SeoJobsTabProps> = ({ onShowToast, siteName })
                   setJobViewMode('editor');
                 }
               }}
-              className="rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-white py-1.5 pl-3 pr-8 text-xs font-bold text-slate-900 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 cursor-pointer max-w-[220px] sm:max-w-xs md:max-w-md truncate"
+              className="rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-white py-1.5 pl-3 pr-8 text-xs font-bold text-slate-900 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-900 dark:[color-scheme:dark] cursor-pointer max-w-[220px] sm:max-w-xs md:max-w-md truncate"
             >
               {filteredJobs.map((j) => (
-                <option key={j.id} value={j.id}>
+                <option key={j.id} value={j.id} className="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100">
                   {j.title} – {j.companyName} {j.seoTitle ? '★ (Custom SEO)' : ''}
                 </option>
               ))}

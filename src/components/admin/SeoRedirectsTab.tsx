@@ -222,10 +222,10 @@ export const SeoRedirectsTab: React.FC<SeoRedirectsTabProps> = ({ onShowToast })
               <select
                 value={statusCode}
                 onChange={(e) => setStatusCode(Number(e.target.value) as 301 | 308)}
-                className="w-full rounded-xl border border-slate-200 bg-white py-2 px-2.5 text-xs font-bold text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                className="w-full rounded-xl border border-slate-200 bg-white py-2 px-2.5 text-xs font-bold text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:[color-scheme:dark]"
               >
-                <option value={301}>301 Permanent</option>
-                <option value={308}>308 Permanent</option>
+                <option value={301} className="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100">301 Permanent</option>
+                <option value={308} className="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100">308 Permanent</option>
               </select>
             </div>
           </div>

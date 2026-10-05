@@ -316,7 +316,7 @@ export const SeoPanel: React.FC<SeoPanelProps> = ({ onShowToast }) => {
     <div className="space-y-5">
       
       {/* STICKY TOP COMMAND & NAVIGATION BAR - Prevents vertical scroll disconnect */}
-      <div className="sticky top-0 z-30 bg-slate-50/95 dark:bg-slate-950/95 backdrop-blur-md pt-1 pb-3 -mt-2 -mx-2 px-2 border-b border-slate-200/80 dark:border-slate-800/80 transition-all flex flex-col md:flex-row md:items-center justify-between gap-3">
+      <div className="sticky top-0 z-30 bg-slate-50/95 dark:bg-slate-950/95 backdrop-blur-md pt-1 pb-3 -mt-2 -mx-2 px-2 border-b border-slate-200/80 dark:border-slate-800/80 transition-all flex flex-col gap-3">
         
         {/* Navigation Sub-Tabs */}
         <div className="flex flex-wrap items-center gap-1">
@@ -394,7 +394,7 @@ export const SeoPanel: React.FC<SeoPanelProps> = ({ onShowToast }) => {
         </div>
 
         {/* Action Controls Dock (Always visible and accessible) */}
-        <div className="flex items-center justify-between md:justify-end gap-2.5 shrink-0">
+        <div className="flex flex-wrap items-center justify-start md:justify-end gap-2.5">
           
           {/* Audit Score Badge */}
           <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-[11px] font-semibold text-slate-600 dark:text-slate-300 shadow-2xs">
@@ -454,7 +454,7 @@ export const SeoPanel: React.FC<SeoPanelProps> = ({ onShowToast }) => {
         <div className="space-y-5">
           
           {/* Top Route Switcher & Directory Mode Bar */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 shadow-xs">
+          <div className="flex flex-col 2xl:flex-row 2xl:items-center justify-between gap-4 p-4 rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 shadow-xs">
             
             {/* Left: Route Selector Dropdown & Prev/Next */}
             <div className="flex flex-wrap items-center gap-2.5">
@@ -473,7 +473,7 @@ export const SeoPanel: React.FC<SeoPanelProps> = ({ onShowToast }) => {
                       setPageViewMode('editor');
                     }
                   }}
-                  className="rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-white py-1.5 pl-3 pr-8 text-xs font-bold text-slate-900 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:[color-scheme:dark] cursor-pointer max-w-[220px] sm:max-w-xs md:max-w-sm truncate"
+                  className="rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-white py-1.5 pl-3 pr-8 text-xs font-bold text-slate-900 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-900 dark:[color-scheme:dark] cursor-pointer max-w-[220px] sm:max-w-xs md:max-w-sm truncate"
                 >
                   <optgroup label="Core Pages" className="bg-white text-slate-700 dark:bg-slate-900 dark:text-slate-200">
                     {pages.filter(p => ['/', '/about', '/contact', '/departments', '/companies'].includes(p.routePath)).map(p => (
@@ -533,8 +533,8 @@ export const SeoPanel: React.FC<SeoPanelProps> = ({ onShowToast }) => {
             </div>
 
             {/* Right: View Switcher (Editor vs All Pages Table) */}
-            <div className="flex items-center gap-2 self-end md:self-center shrink-0">
-              <div className="inline-flex rounded-xl border border-slate-200 bg-slate-100/80 p-0.5 dark:border-slate-700 dark:bg-slate-950">
+            <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2 self-start 2xl:self-center">
+              <div className="inline-flex max-w-full flex-wrap rounded-xl border border-slate-200 bg-slate-100/80 p-0.5 dark:border-slate-700 dark:bg-slate-950">
                 <button
                   type="button"
                   onClick={() => setPageViewMode('editor')}
@@ -545,7 +545,7 @@ export const SeoPanel: React.FC<SeoPanelProps> = ({ onShowToast }) => {
                   }`}
                 >
                   <Sliders className="h-3.5 w-3.5" />
-                  <span>Editor View</span>
+                  <span className="whitespace-nowrap">Editor View</span>
                 </button>
                 <button
                   type="button"
@@ -557,7 +557,7 @@ export const SeoPanel: React.FC<SeoPanelProps> = ({ onShowToast }) => {
                   }`}
                 >
                   <Table className="h-3.5 w-3.5" />
-                  <span>All Pages Table ({pages.length})</span>
+                  <span className="whitespace-nowrap">All Pages Table ({pages.length})</span>
                 </button>
               </div>
             </div>
@@ -900,8 +900,8 @@ export const SeoPanel: React.FC<SeoPanelProps> = ({ onShowToast }) => {
                         onChange={(e) => handleUpdateActivePage('ogType', e.target.value)}
                         className="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-2.5 px-3 text-xs text-slate-900 focus:bg-white focus:border-indigo-500 focus:outline-none dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-100 dark:focus:bg-slate-900"
                       >
-                        <option value="website">website (Standard Page)</option>
-                        <option value="article">article (Blog / Guide)</option>
+                        <option value="website" className="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100">website (Standard Page)</option>
+                        <option value="article" className="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100">article (Blog / Guide)</option>
                       </select>
                     </div>
 
@@ -914,8 +914,8 @@ export const SeoPanel: React.FC<SeoPanelProps> = ({ onShowToast }) => {
                         onChange={(e) => handleUpdateActivePage('twitterCard', e.target.value)}
                         className="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-2.5 px-3 text-xs text-slate-900 focus:bg-white focus:border-indigo-500 focus:outline-none dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-100 dark:focus:bg-slate-900"
                       >
-                        <option value="summary_large_image">summary_large_image (Large Banner)</option>
-                        <option value="summary">summary (Compact Card)</option>
+                        <option value="summary_large_image" className="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100">summary_large_image (Large Banner)</option>
+                        <option value="summary" className="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100">summary (Compact Card)</option>
                       </select>
                     </div>
                   </div>
