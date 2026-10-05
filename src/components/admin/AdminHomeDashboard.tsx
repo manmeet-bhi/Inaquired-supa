@@ -3,12 +3,12 @@ import {
   FileText, 
   Archive, 
   FolderTree, 
+  FolderOpen,
   Sparkles, 
   ArrowUpRight,
   Database,
   Edit3
 } from 'lucide-react';
-import { JobIcon } from '../icons/JobIcon';
 import { Job } from '../../types/job';
 import { Category } from '../../services/categoryService';
 import { ManagedUser } from '../../types/user';
@@ -58,7 +58,7 @@ export const AdminHomeDashboard: React.FC<AdminHomeDashboardProps> = ({
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">All Listings</span>
             <div className="h-9 w-9 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400 group-hover:scale-110 transition-transform">
-              <JobIcon className="h-4 w-4" />
+              <FolderOpen className="h-4 w-4" />
             </div>
           </div>
           <div className="mt-3 flex items-baseline gap-2">
