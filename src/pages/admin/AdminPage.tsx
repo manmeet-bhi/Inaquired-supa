@@ -98,6 +98,19 @@ interface AdminPageProps {
 
 export type AdminTab = 'home' | 'jobs' | 'categories' | 'users' | 'seo' | 'profile';
 
+function getPageNumbers(currentPage: number, totalPages: number): (number | string)[] {
+  if (totalPages <= 7) {
+    return Array.from({ length: totalPages }, (_, i) => i + 1);
+  }
+  if (currentPage <= 4) {
+    return [1, 2, 3, 4, 5, '...', totalPages];
+  }
+  if (currentPage >= totalPages - 3) {
+    return [1, '...', totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+  }
+  return [1, '...', currentPage - 1, currentPage, currentPage + 1, '...', totalPages];
+}
+
 export interface AdminRouteState {
   tab: AdminTab;
   isJobEditorOpen: boolean;
@@ -107,6 +120,7 @@ export interface AdminRouteState {
   isUserEditorOpen: boolean;
   editingUserId: string | null;
   statusFilter?: 'all' | JobStatus;
+  page?: number;
 }
 
 export function parseAdminPath(pathname: string): AdminRouteState {
@@ -120,6 +134,12 @@ export function parseAdminPath(pathname: string): AdminRouteState {
     initialStatusFilter = statusParam as 'all' | JobStatus;
   }
 
+  let initialPage: number | undefined;
+  const pageParam = parseInt(searchParams.get('page') || '', 10);
+  if (!isNaN(pageParam) && pageParam > 0) {
+    initialPage = pageParam;
+  }
+
   // 1. Home Dashboard: /admin or /admin/home or /admin/dashboard
   if (clean === '/admin' || clean === '/admin/home' || clean === '/admin/dashboard') {
     return {
@@ -130,6 +150,7 @@ export function parseAdminPath(pathname: string): AdminRouteState {
       editingCategoryId: null,
       isUserEditorOpen: false,
       editingUserId: null,
+      page: initialPage,
     };
   }
 
@@ -144,6 +165,7 @@ export function parseAdminPath(pathname: string): AdminRouteState {
       isUserEditorOpen: false,
       editingUserId: null,
       statusFilter: 'draft',
+      page: initialPage,
     };
   }
 
@@ -158,6 +180,7 @@ export function parseAdminPath(pathname: string): AdminRouteState {
       isUserEditorOpen: false,
       editingUserId: null,
       statusFilter: 'archived',
+      page: initialPage,
     };
   }
 
@@ -172,6 +195,7 @@ export function parseAdminPath(pathname: string): AdminRouteState {
       isUserEditorOpen: false,
       editingUserId: null,
       statusFilter: initialStatusFilter || 'all',
+      page: initialPage,
     };
   }
 
@@ -212,6 +236,7 @@ export function parseAdminPath(pathname: string): AdminRouteState {
       editingCategoryId: null,
       isUserEditorOpen: false,
       editingUserId: null,
+      page: initialPage,
     };
   }
 
@@ -333,6 +358,7 @@ export function parseAdminPath(pathname: string): AdminRouteState {
         editingCategoryId: null,
         isUserEditorOpen: false,
         editingUserId: null,
+        page: initialPage,
       };
     }
   }
@@ -345,6 +371,7 @@ export function parseAdminPath(pathname: string): AdminRouteState {
     editingCategoryId: null,
     isUserEditorOpen: false,
     editingUserId: null,
+    page: initialPage,
   };
 }
 
@@ -517,6 +544,11 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
     if (parsed.statusFilter !== undefined) {
       setStatusFilter(parsed.statusFilter);
     }
+    if (parsed.tab === 'jobs') {
+      setJobsPage(parsed.page || 1);
+    } else if (parsed.tab === 'categories') {
+      setDepartmentsPage(parsed.page || 1);
+    }
     setIsJobEditorOpen(parsed.isJobEditorOpen);
     setEditingJobId(parsed.editingJobId);
     setIsCategoryEditorOpen(parsed.isCategoryEditorOpen);
@@ -548,6 +580,11 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
         setActiveTab(parsed.tab);
         if (parsed.statusFilter !== undefined) {
           setStatusFilter(parsed.statusFilter);
+        }
+        if (parsed.tab === 'jobs') {
+          setJobsPage(parsed.page || 1);
+        } else if (parsed.tab === 'categories') {
+          setDepartmentsPage(parsed.page || 1);
         }
         setIsJobEditorOpen(parsed.isJobEditorOpen);
         setEditingJobId(parsed.editingJobId);
@@ -669,6 +706,15 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
   const [jobTypeFilter, setJobTypeFilter] = useState<string>('all');
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'newest' | 'salary' | 'title'>('newest');
+
+  // Pagination States
+  const [jobsPage, setJobsPage] = useState<number>(() => {
+    return initialRoute.tab === 'jobs' && initialRoute.page ? initialRoute.page : 1;
+  });
+  const [departmentsPage, setDepartmentsPage] = useState<number>(() => {
+    return initialRoute.tab === 'categories' && initialRoute.page ? initialRoute.page : 1;
+  });
+  const mainScrollRef = React.useRef<HTMLDivElement>(null);
 
   // Job Delete Modal States
   const [isDeleteJobModalOpen, setIsDeleteJobModalOpen] = useState(false);
@@ -995,6 +1041,76 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
         (c.description || '').toLowerCase().includes(q)
     );
   }, [categories, categorySearch]);
+
+  // Pagination Constants
+  const JOBS_PER_PAGE = 21;
+  const DEPARTMENTS_PER_PAGE = 12;
+
+  // Paginated Jobs (21 per page)
+  const totalJobPages = useMemo(() => {
+    return Math.max(1, Math.ceil(filteredJobs.length / JOBS_PER_PAGE));
+  }, [filteredJobs.length]);
+
+  const paginatedJobs = useMemo(() => {
+    const start = (jobsPage - 1) * JOBS_PER_PAGE;
+    return filteredJobs.slice(start, start + JOBS_PER_PAGE);
+  }, [filteredJobs, jobsPage]);
+
+  useEffect(() => {
+    if (jobsPage > totalJobPages) {
+      setJobsPage(totalJobPages);
+    }
+  }, [jobsPage, totalJobPages]);
+
+  // Paginated Categories / Departments (12 per page)
+  const totalDepartmentPages = useMemo(() => {
+    return Math.max(1, Math.ceil(filteredCategories.length / DEPARTMENTS_PER_PAGE));
+  }, [filteredCategories.length]);
+
+  const paginatedCategories = useMemo(() => {
+    const start = (departmentsPage - 1) * DEPARTMENTS_PER_PAGE;
+    return filteredCategories.slice(start, start + DEPARTMENTS_PER_PAGE);
+  }, [filteredCategories, departmentsPage]);
+
+  useEffect(() => {
+    if (departmentsPage > totalDepartmentPages) {
+      setDepartmentsPage(totalDepartmentPages);
+    }
+  }, [departmentsPage, totalDepartmentPages]);
+
+  const handleJobsPageChange = (newPage: number) => {
+    setJobsPage(newPage);
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      if (newPage > 1) {
+        url.searchParams.set('page', String(newPage));
+      } else {
+        url.searchParams.delete('page');
+      }
+      window.history.pushState(null, '', url.pathname + url.search);
+      try {
+        window.sessionStorage.setItem(ADMIN_LAST_PATH_KEY, url.pathname + url.search);
+      } catch {}
+    }
+    mainScrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleDepartmentsPageChange = (newPage: number) => {
+    setDepartmentsPage(newPage);
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      if (newPage > 1) {
+        url.searchParams.set('page', String(newPage));
+      } else {
+        url.searchParams.delete('page');
+      }
+      window.history.pushState(null, '', url.pathname + url.search);
+      try {
+        window.sessionStorage.setItem(ADMIN_LAST_PATH_KEY, url.pathname + url.search);
+      } catch {}
+    }
+    mainScrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   // Jobs Statistics
   const stats = useMemo(() => {
@@ -1502,7 +1618,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
       </aside>
 
       {/* MAIN VIEWPORT CONTAINER - SCROLLABLE PAGE CONTENT */}
-      <div className="flex-1 flex flex-col min-w-0 h-full overflow-y-auto">
+      <div ref={mainScrollRef} className="flex-1 flex flex-col min-w-0 h-full overflow-y-auto">
         {isJobEditorOpen && activeTab === 'jobs' ? (
           <JobEditorPage
             initialJob={editingJob}
@@ -1606,6 +1722,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
                 <div 
                   onClick={() => {
                     setStatusFilter('all');
+                    setJobsPage(1);
                     navigateToAdminPath('/admin/jobs?status=all');
                   }}
                   className={`rounded-2xl border p-4 shadow-xs cursor-pointer transition-all ${
@@ -1621,6 +1738,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
                 <div 
                   onClick={() => {
                     setStatusFilter('published');
+                    setJobsPage(1);
                     navigateToAdminPath('/admin/jobs?status=published');
                   }}
                   className={`rounded-2xl border p-4 shadow-xs cursor-pointer transition-all ${
@@ -1636,6 +1754,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
                 <div 
                   onClick={() => {
                     setStatusFilter('draft');
+                    setJobsPage(1);
                     navigateToAdminPath('/admin/jobs?status=draft');
                   }}
                   className={`rounded-2xl border p-4 shadow-xs cursor-pointer transition-all ${
@@ -1651,6 +1770,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
                 <div 
                   onClick={() => {
                     setStatusFilter('archived');
+                    setJobsPage(1);
                     navigateToAdminPath('/admin/jobs?status=archived');
                   }}
                   className={`rounded-2xl border p-4 shadow-xs cursor-pointer transition-all ${
@@ -1684,13 +1804,19 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
                     <input
                       type="text"
                       value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onChange={(e) => {
+                        setSearchQuery(e.target.value);
+                        setJobsPage(1);
+                      }}
                       placeholder="Search roles by title, company, skills, or department..."
                       className="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-2 pl-10 pr-4 text-xs sm:text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-100"
                     />
                     {searchQuery && (
                       <button
-                        onClick={() => setSearchQuery('')}
+                        onClick={() => {
+                          setSearchQuery('');
+                          setJobsPage(1);
+                        }}
                         className="absolute right-3 top-2.5 text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
                       >
                         Clear
@@ -1706,6 +1832,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
                       onChange={(e) => {
                         const newStatus = e.target.value as any;
                         setStatusFilter(newStatus);
+                        setJobsPage(1);
                         navigateToAdminPath(`/admin/jobs${newStatus !== 'all' ? `?status=${newStatus}` : ''}`);
                       }}
                       className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 focus:border-indigo-500 focus:outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300"
@@ -1719,7 +1846,10 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
                     {/* Department / Category Filter */}
                     <select
                       value={selectedCategoryFilter}
-                      onChange={(e) => setSelectedCategoryFilter(e.target.value)}
+                      onChange={(e) => {
+                        setSelectedCategoryFilter(e.target.value);
+                        setJobsPage(1);
+                      }}
                       className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 focus:border-indigo-500 focus:outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300"
                     >
                       <option value="all">All Departments</option>
@@ -1731,7 +1861,10 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
                     {/* Arrangement Filter */}
                     <select
                       value={arrangementFilter}
-                      onChange={(e) => setWorkArrangementFilter(e.target.value)}
+                      onChange={(e) => {
+                        setWorkArrangementFilter(e.target.value);
+                        setJobsPage(1);
+                      }}
                       className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 focus:border-indigo-500 focus:outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300"
                     >
                       <option value="all">All Workstyles</option>
@@ -1743,7 +1876,10 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
                     {/* Sort Order */}
                     <select
                       value={sortBy}
-                      onChange={(e) => setSortBy(e.target.value as any)}
+                      onChange={(e) => {
+                        setSortBy(e.target.value as any);
+                        setJobsPage(1);
+                      }}
                       className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 focus:border-indigo-500 focus:outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300"
                     >
                       <option value="newest">Sort: Newest</option>
@@ -1751,6 +1887,24 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
                       <option value="title">Sort: Title (A-Z)</option>
                     </select>
                   </div>
+                </div>
+
+                {/* Range and count indicator */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-xs text-slate-500 dark:text-slate-400 pt-2 border-t border-slate-100 dark:border-slate-800/80">
+                  <span>
+                    Showing{' '}
+                    <strong className="text-slate-800 dark:text-slate-200">
+                      {filteredJobs.length === 0 ? 0 : (jobsPage - 1) * JOBS_PER_PAGE + 1}–{Math.min(jobsPage * JOBS_PER_PAGE, filteredJobs.length)}
+                    </strong>{' '}
+                    of <strong className="text-slate-800 dark:text-slate-200">{filteredJobs.length}</strong> listings
+                    {jobs.length !== filteredJobs.length && ` (filtered from ${jobs.length} total)`}
+                  </span>
+                  {totalJobPages > 1 && (
+                    <span>
+                      Page <strong className="text-slate-800 dark:text-slate-200">{jobsPage}</strong> of{' '}
+                      <strong className="text-slate-800 dark:text-slate-200">{totalJobPages}</strong>
+                    </span>
+                  )}
                 </div>
               </section>
 
@@ -1778,150 +1932,216 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
                     </button>
                   </div>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs">
-                      <thead className="border-b border-slate-200 bg-slate-50/70 text-[11px] font-semibold text-slate-500 uppercase tracking-wider dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-400">
-                        <tr>
-                          <th className="py-3 pl-5 pr-3">Job & Organization</th>
-                          <th className="px-3 py-3 w-40 whitespace-nowrap">Department</th>
-                          <th className="px-3 py-3 w-32 whitespace-nowrap">Workstyle</th>
-                          <th className="px-3 py-3 w-48 text-center whitespace-nowrap">Status</th>
-                          <th className="px-3 py-3 w-24 text-center whitespace-nowrap">Spotlight</th>
-                          <th className="py-3 pl-3 pr-5 w-32 text-right whitespace-nowrap">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
-                        {filteredJobs.map((job) => {
-                          const isPublished = job.status === 'published';
-                          const isDraft = job.status === 'draft';
-                          const isArchived = job.status === 'archived';
+                  <>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead className="border-b border-slate-200 bg-slate-50/70 text-[11px] font-semibold text-slate-500 uppercase tracking-wider dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-400">
+                          <tr>
+                            <th className="py-3 pl-5 pr-3">Job & Organization</th>
+                            <th className="px-3 py-3 w-40 whitespace-nowrap">Department</th>
+                            <th className="px-3 py-3 w-32 whitespace-nowrap">Workstyle</th>
+                            <th className="px-3 py-3 w-48 text-center whitespace-nowrap">Status</th>
+                            <th className="px-3 py-3 w-24 text-center whitespace-nowrap">Spotlight</th>
+                            <th className="py-3 pl-3 pr-5 w-32 text-right whitespace-nowrap">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                          {paginatedJobs.map((job) => {
+                            const isPublished = job.status === 'published';
+                            const isDraft = job.status === 'draft';
+                            const isArchived = job.status === 'archived';
 
-                          return (
-                            <tr 
-                              key={job.id}
-                              className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors"
-                            >
-                              {/* Job Title & Company */}
-                              <td className="py-3.5 pl-5 pr-3">
-                                <div className="flex flex-col">
-                                  <span className="font-bold text-slate-900 dark:text-white line-clamp-1">
-                                    {job.title}
-                                  </span>
-                                  <div className="flex items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400">
-                                    <span>{job.companyName}</span>
-                                    <span>•</span>
-                                    <span className="flex items-center gap-1">
-                                      <MapPin className="h-3 w-3" />
-                                      {job.location}
+                            return (
+                              <tr 
+                                key={job.id}
+                                className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors"
+                              >
+                                {/* Job Title & Company */}
+                                <td className="py-3.5 pl-5 pr-3">
+                                  <div className="flex flex-col">
+                                    <span className="font-bold text-slate-900 dark:text-white line-clamp-1">
+                                      {job.title}
                                     </span>
+                                    <div className="flex items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400">
+                                      <span>{job.companyName}</span>
+                                      <span>•</span>
+                                      <span className="flex items-center gap-1">
+                                        <MapPin className="h-3 w-3" />
+                                        {job.location}
+                                      </span>
+                                    </div>
                                   </div>
-                                </div>
-                              </td>
+                                </td>
 
-                              {/* Department */}
-                              <td className="px-3 py-3.5 whitespace-nowrap">
-                                <span className="inline-flex items-center rounded-lg bg-indigo-50 px-2 py-0.5 text-[11px] font-medium text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200/50 dark:border-indigo-800/50">
-                                  {job.category || 'Engineering'}
-                                </span>
-                              </td>
+                                {/* Department */}
+                                <td className="px-3 py-3.5 whitespace-nowrap">
+                                  <span className="inline-flex items-center rounded-lg bg-indigo-50 px-2 py-0.5 text-[11px] font-medium text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200/50 dark:border-indigo-800/50">
+                                    {job.category || 'Engineering'}
+                                  </span>
+                                </td>
 
-                              {/* Work Arrangement */}
-                              <td className="px-3 py-3.5 whitespace-nowrap capitalize text-slate-600 dark:text-slate-400">
-                                {job.workArrangement}
-                              </td>
+                                {/* Work Arrangement */}
+                                <td className="px-3 py-3.5 whitespace-nowrap capitalize text-slate-600 dark:text-slate-400">
+                                  {job.workArrangement}
+                                </td>
 
-                              {/* Status Toggle Switcher */}
-                              <td className="px-3 py-3.5 text-center whitespace-nowrap">
-                                <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5 dark:border-slate-800 dark:bg-slate-950">
+                                {/* Status Toggle Switcher */}
+                                <td className="px-3 py-3.5 text-center whitespace-nowrap">
+                                  <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5 dark:border-slate-800 dark:bg-slate-950">
+                                    <button
+                                      onClick={() => handleToggleJobStatus(job, 'published')}
+                                      className={`rounded-md px-2 py-0.5 text-[10px] font-semibold transition-all ${
+                                        isPublished
+                                          ? 'bg-emerald-600 text-white shadow-xs'
+                                          : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
+                                      }`}
+                                      title="Publish live to candidates"
+                                    >
+                                      Live
+                                    </button>
+                                    <button
+                                      onClick={() => handleToggleJobStatus(job, 'draft')}
+                                      className={`rounded-md px-2 py-0.5 text-[10px] font-semibold transition-all ${
+                                        isDraft
+                                          ? 'bg-amber-600 text-white shadow-xs'
+                                          : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
+                                      }`}
+                                      title="Save as Draft"
+                                    >
+                                      Draft
+                                    </button>
+                                    <button
+                                      onClick={() => handleToggleJobStatus(job, 'archived')}
+                                      className={`rounded-md px-2 py-0.5 text-[10px] font-semibold transition-all ${
+                                        isArchived
+                                          ? 'bg-slate-700 text-white shadow-xs'
+                                          : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
+                                      }`}
+                                      title="Archive role"
+                                    >
+                                      Archive
+                                    </button>
+                                  </div>
+                                </td>
+
+                                {/* Featured Spotlight */}
+                                <td className="px-3 py-3.5 text-center whitespace-nowrap">
                                   <button
-                                    onClick={() => handleToggleJobStatus(job, 'published')}
-                                    className={`rounded-md px-2 py-0.5 text-[10px] font-semibold transition-all ${
-                                      isPublished
-                                        ? 'bg-emerald-600 text-white shadow-xs'
-                                        : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
+                                    onClick={() => handleToggleJobFeatured(job)}
+                                    className={`p-1.5 rounded-lg border transition-colors ${
+                                      job.featured
+                                        ? 'bg-amber-50 text-amber-500 border-amber-200 dark:bg-amber-950/50 dark:border-amber-800'
+                                        : 'text-slate-400 hover:text-slate-600 border-transparent hover:bg-slate-100 dark:hover:bg-slate-800'
                                     }`}
-                                    title="Publish live to candidates"
+                                    title={job.featured ? 'Remove featured badge' : 'Spotlight on homepage'}
                                   >
-                                    Live
+                                    <Star className={`h-4 w-4 ${job.featured ? 'fill-amber-400' : ''}`} />
                                   </button>
-                                  <button
-                                    onClick={() => handleToggleJobStatus(job, 'draft')}
-                                    className={`rounded-md px-2 py-0.5 text-[10px] font-semibold transition-all ${
-                                      isDraft
-                                        ? 'bg-amber-600 text-white shadow-xs'
-                                        : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
-                                    }`}
-                                    title="Save as Draft"
-                                  >
-                                    Draft
-                                  </button>
-                                  <button
-                                    onClick={() => handleToggleJobStatus(job, 'archived')}
-                                    className={`rounded-md px-2 py-0.5 text-[10px] font-semibold transition-all ${
-                                      isArchived
-                                        ? 'bg-slate-700 text-white shadow-xs'
-                                        : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
-                                    }`}
-                                    title="Archive role"
-                                  >
-                                    Archive
-                                  </button>
-                                </div>
-                              </td>
+                                </td>
 
-                              {/* Featured Spotlight */}
-                              <td className="px-3 py-3.5 text-center whitespace-nowrap">
-                                <button
-                                  onClick={() => handleToggleJobFeatured(job)}
-                                  className={`p-1.5 rounded-lg border transition-colors ${
-                                    job.featured
-                                      ? 'bg-amber-50 text-amber-500 border-amber-200 dark:bg-amber-950/50 dark:border-amber-800'
-                                      : 'text-slate-400 hover:text-slate-600 border-transparent hover:bg-slate-100 dark:hover:bg-slate-800'
-                                  }`}
-                                  title={job.featured ? 'Remove featured badge' : 'Spotlight on homepage'}
+                                {/* Actions */}
+                                <td className="py-3.5 pl-3 pr-5 text-right whitespace-nowrap">
+                                  <div className="flex items-center justify-end gap-1">
+                                    <button
+                                      onClick={() => onNavigate(`/jobs/${job.slug}`)}
+                                      className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200 transition-colors"
+                                      title="View role page on site"
+                                    >
+                                      <Eye className="h-4 w-4" />
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        setEditingJob(job);
+                                        navigateToAdminPath(`/admin/edit-job/${job.id}`);
+                                      }}
+                                      className="rounded-lg p-1.5 text-indigo-600 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-950/50 transition-colors"
+                                      title="Edit listing"
+                                    >
+                                      <Edit3 className="h-4 w-4" />
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        setDeletingJob(job);
+                                        setIsDeleteJobModalOpen(true);
+                                      }}
+                                      className="rounded-lg p-1.5 text-rose-500 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/50 transition-colors"
+                                      title="Delete from Supabase"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Pagination Controls */}
+                    {totalJobPages > 1 && (
+                      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-5 py-3.5 border-t border-slate-200 bg-slate-50/70 dark:border-slate-800 dark:bg-slate-950/40">
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                          Showing{' '}
+                          <strong className="text-slate-800 dark:text-slate-200">
+                            {(jobsPage - 1) * JOBS_PER_PAGE + 1}–{Math.min(jobsPage * JOBS_PER_PAGE, filteredJobs.length)}
+                          </strong>{' '}
+                          of <strong className="text-slate-800 dark:text-slate-200">{filteredJobs.length}</strong> listings
+                        </p>
+
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={() => handleJobsPageChange(Math.max(1, jobsPage - 1))}
+                            disabled={jobsPage === 1}
+                            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                            aria-label="Previous page"
+                          >
+                            <ChevronLeft className="h-3.5 w-3.5" />
+                            <span>Prev</span>
+                          </button>
+
+                          {getPageNumbers(jobsPage, totalJobPages).map((p, idx) => {
+                            if (p === '...') {
+                              return (
+                                <span
+                                  key={`ellipsis-jobs-${idx}`}
+                                  className="inline-flex h-8 w-8 items-center justify-center text-xs text-slate-400 select-none"
                                 >
-                                  <Star className={`h-4 w-4 ${job.featured ? 'fill-amber-400' : ''}`} />
-                                </button>
-                              </td>
+                                  …
+                                </span>
+                              );
+                            }
+                            const pageNum = p as number;
+                            const isActive = pageNum === jobsPage;
+                            return (
+                              <button
+                                key={`page-jobs-${pageNum}`}
+                                onClick={() => handleJobsPageChange(pageNum)}
+                                aria-current={isActive ? 'page' : undefined}
+                                className={`inline-flex h-8 w-8 items-center justify-center rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                                  isActive
+                                    ? 'bg-indigo-600 text-white shadow-xs'
+                                    : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800'
+                                }`}
+                              >
+                                {pageNum}
+                              </button>
+                            );
+                          })}
 
-                              {/* Actions */}
-                              <td className="py-3.5 pl-3 pr-5 text-right whitespace-nowrap">
-                                <div className="flex items-center justify-end gap-1">
-                                  <button
-                                    onClick={() => onNavigate(`/jobs/${job.slug}`)}
-                                    className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200 transition-colors"
-                                    title="View role page on site"
-                                  >
-                                    <Eye className="h-4 w-4" />
-                                  </button>
-                                  <button
-                                    onClick={() => {
-                                      setEditingJob(job);
-                                      navigateToAdminPath(`/admin/edit-job/${job.id}`);
-                                    }}
-                                    className="rounded-lg p-1.5 text-indigo-600 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-950/50 transition-colors"
-                                    title="Edit listing"
-                                  >
-                                    <Edit3 className="h-4 w-4" />
-                                  </button>
-                                  <button
-                                    onClick={() => {
-                                      setDeletingJob(job);
-                                      setIsDeleteJobModalOpen(true);
-                                    }}
-                                    className="rounded-lg p-1.5 text-rose-500 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/50 transition-colors"
-                                    title="Delete from Supabase"
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
+                          <button
+                            onClick={() => handleJobsPageChange(Math.min(totalJobPages, jobsPage + 1))}
+                            disabled={jobsPage === totalJobPages}
+                            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                            aria-label="Next page"
+                          >
+                            <span>Next</span>
+                            <ChevronRight className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
               </section>
             </div>
@@ -1938,13 +2158,19 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
                   <input
                     type="text"
                     value={categorySearch}
-                    onChange={(e) => setCategorySearch(e.target.value)}
+                    onChange={(e) => {
+                      setCategorySearch(e.target.value);
+                      setDepartmentsPage(1);
+                    }}
                     placeholder="Search departments by name or URL slug..."
                     className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-10 pr-4 text-xs sm:text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
                   />
                   {categorySearch && (
                     <button
-                      onClick={() => setCategorySearch('')}
+                      onClick={() => {
+                        setCategorySearch('');
+                        setDepartmentsPage(1);
+                      }}
                       className="absolute right-3 top-2.5 text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
                     >
                       Clear
@@ -1953,7 +2179,14 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
                 </div>
 
                 <div className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-2">
-                  <span>Showing <strong>{filteredCategories.length}</strong> of <strong>{categories.length}</strong> departments</span>
+                  <span>
+                    Showing{' '}
+                    <strong className="text-slate-800 dark:text-slate-200">
+                      {filteredCategories.length === 0 ? 0 : (departmentsPage - 1) * DEPARTMENTS_PER_PAGE + 1}–{Math.min(departmentsPage * DEPARTMENTS_PER_PAGE, filteredCategories.length)}
+                    </strong>{' '}
+                    of <strong className="text-slate-800 dark:text-slate-200">{filteredCategories.length}</strong> departments
+                    {categories.length !== filteredCategories.length && ` (${categories.length} total)`}
+                  </span>
                 </div>
               </div>
 
@@ -1979,100 +2212,166 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
                     </button>
                   </div>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs">
-                      <thead className="border-b border-slate-200 bg-slate-50/70 text-[11px] font-semibold text-slate-500 uppercase tracking-wider dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-400">
-                        <tr>
-                          <th className="py-3 pl-5 pr-3">Department Name</th>
-                          <th className="px-3 py-3">URL Slug</th>
-                          <th className="px-3 py-3 text-center">Active Roles</th>
-                          <th className="py-3 pl-3 pr-5 text-right">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
-                        {filteredCategories.map((cat) => {
-                          const roleCount = categoryJobCounts[cat.name] || 0;
-                          const isCopied = copiedSlug === cat.slug;
+                  <>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead className="border-b border-slate-200 bg-slate-50/70 text-[11px] font-semibold text-slate-500 uppercase tracking-wider dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-400">
+                          <tr>
+                            <th className="py-3 pl-5 pr-3">Department Name</th>
+                            <th className="px-3 py-3">URL Slug</th>
+                            <th className="px-3 py-3 text-center">Active Roles</th>
+                            <th className="py-3 pl-3 pr-5 text-right">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                          {paginatedCategories.map((cat) => {
+                            const roleCount = categoryJobCounts[cat.name] || 0;
+                            const isCopied = copiedSlug === cat.slug;
 
-                          return (
-                            <tr 
-                              key={cat.id}
-                              className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors"
-                            >
-                              {/* Department Name */}
-                              <td className="py-3.5 pl-5 pr-3 whitespace-nowrap">
-                                <div className="flex items-center gap-2.5">
-                                  <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400">
-                                    <Layers className="h-3.5 w-3.5" />
+                            return (
+                              <tr 
+                                key={cat.id}
+                                className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors"
+                              >
+                                {/* Department Name */}
+                                <td className="py-3.5 pl-5 pr-3 whitespace-nowrap">
+                                  <div className="flex items-center gap-2.5">
+                                    <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400">
+                                      <Layers className="h-3.5 w-3.5" />
+                                    </div>
+                                    <span className="font-bold text-slate-900 dark:text-white">
+                                      {cat.name}
+                                    </span>
                                   </div>
-                                  <span className="font-bold text-slate-900 dark:text-white">
-                                    {cat.name}
-                                  </span>
-                                </div>
-                              </td>
+                                </td>
 
-                              {/* URL Slug Pill with Copy */}
-                              <td className="px-3 py-3.5 whitespace-nowrap">
-                                <div className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50/80 px-2.5 py-1 text-slate-700 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300">
-                                  <span className="font-mono text-[11px] text-indigo-600 dark:text-indigo-400">
-                                    /category/{cat.slug}
-                                  </span>
-                                  <button
-                                    onClick={() => handleCopySlug(cat.slug)}
-                                    className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
-                                    title="Copy category URL"
-                                  >
-                                    {isCopied ? (
-                                      <Check className="h-3 w-3 text-emerald-500" />
-                                    ) : (
-                                      <Copy className="h-3 w-3" />
-                                    )}
-                                  </button>
-                                </div>
-                              </td>
+                                {/* URL Slug Pill with Copy */}
+                                <td className="px-3 py-3.5 whitespace-nowrap">
+                                  <div className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50/80 px-2.5 py-1 text-slate-700 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300">
+                                    <span className="font-mono text-[11px] text-indigo-600 dark:text-indigo-400">
+                                      /category/{cat.slug}
+                                    </span>
+                                    <button
+                                      onClick={() => handleCopySlug(cat.slug)}
+                                      className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+                                      title="Copy category URL"
+                                    >
+                                      {isCopied ? (
+                                        <Check className="h-3 w-3 text-emerald-500" />
+                                      ) : (
+                                        <Copy className="h-3 w-3" />
+                                      )}
+                                    </button>
+                                  </div>
+                                </td>
 
-                              {/* Associated Job Count */}
-                              <td className="px-3 py-3.5 text-center whitespace-nowrap">
-                                <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
-                                  roleCount > 0
-                                    ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200/50 dark:border-emerald-800/50'
-                                    : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
-                                }`}>
-                                  {roleCount} {roleCount === 1 ? 'role' : 'roles'}
+                                {/* Associated Job Count */}
+                                <td className="px-3 py-3.5 text-center whitespace-nowrap">
+                                  <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
+                                    roleCount > 0
+                                      ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200/50 dark:border-emerald-800/50'
+                                      : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
+                                  }`}>
+                                    {roleCount} {roleCount === 1 ? 'role' : 'roles'}
+                                  </span>
+                                </td>
+
+                                {/* Actions */}
+                                <td className="py-3.5 pl-3 pr-5 text-right whitespace-nowrap">
+                                  <div className="flex items-center justify-end gap-1">
+                                    <button
+                                      onClick={() => {
+                                        setEditingCategory(cat);
+                                        navigateToAdminPath(`/admin/edit-department/${cat.id}`);
+                                      }}
+                                      className="rounded-lg p-1.5 text-indigo-600 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-950/50 transition-colors cursor-pointer"
+                                      title="Edit department name and URL slug"
+                                    >
+                                      <Edit3 className="h-4 w-4" />
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        setDeletingCategory(cat);
+                                        setIsDeleteCategoryModalOpen(true);
+                                      }}
+                                      className="rounded-lg p-1.5 text-rose-500 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/50 transition-colors"
+                                      title="Delete department"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Pagination Controls */}
+                    {totalDepartmentPages > 1 && (
+                      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-5 py-3.5 border-t border-slate-200 bg-slate-50/70 dark:border-slate-800 dark:bg-slate-950/40">
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                          Showing{' '}
+                          <strong className="text-slate-800 dark:text-slate-200">
+                            {(departmentsPage - 1) * DEPARTMENTS_PER_PAGE + 1}–{Math.min(departmentsPage * DEPARTMENTS_PER_PAGE, filteredCategories.length)}
+                          </strong>{' '}
+                          of <strong className="text-slate-800 dark:text-slate-200">{filteredCategories.length}</strong> departments
+                        </p>
+
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={() => handleDepartmentsPageChange(Math.max(1, departmentsPage - 1))}
+                            disabled={departmentsPage === 1}
+                            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                            aria-label="Previous page"
+                          >
+                            <ChevronLeft className="h-3.5 w-3.5" />
+                            <span>Prev</span>
+                          </button>
+
+                          {getPageNumbers(departmentsPage, totalDepartmentPages).map((p, idx) => {
+                            if (p === '...') {
+                              return (
+                                <span
+                                  key={`ellipsis-dept-${idx}`}
+                                  className="inline-flex h-8 w-8 items-center justify-center text-xs text-slate-400 select-none"
+                                >
+                                  …
                                 </span>
-                              </td>
+                              );
+                            }
+                            const pageNum = p as number;
+                            const isActive = pageNum === departmentsPage;
+                            return (
+                              <button
+                                key={`page-dept-${pageNum}`}
+                                onClick={() => handleDepartmentsPageChange(pageNum)}
+                                aria-current={isActive ? 'page' : undefined}
+                                className={`inline-flex h-8 w-8 items-center justify-center rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                                  isActive
+                                    ? 'bg-indigo-600 text-white shadow-xs'
+                                    : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800'
+                                }`}
+                              >
+                                {pageNum}
+                              </button>
+                            );
+                          })}
 
-                              {/* Actions */}
-                              <td className="py-3.5 pl-3 pr-5 text-right whitespace-nowrap">
-                                <div className="flex items-center justify-end gap-1">
-                                  <button
-                                    onClick={() => {
-                                      setEditingCategory(cat);
-                                      navigateToAdminPath(`/admin/edit-department/${cat.id}`);
-                                    }}
-                                    className="rounded-lg p-1.5 text-indigo-600 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-950/50 transition-colors cursor-pointer"
-                                    title="Edit department name and URL slug"
-                                  >
-                                    <Edit3 className="h-4 w-4" />
-                                  </button>
-                                  <button
-                                    onClick={() => {
-                                      setDeletingCategory(cat);
-                                      setIsDeleteCategoryModalOpen(true);
-                                    }}
-                                    className="rounded-lg p-1.5 text-rose-500 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/50 transition-colors"
-                                    title="Delete department"
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
+                          <button
+                            onClick={() => handleDepartmentsPageChange(Math.min(totalDepartmentPages, departmentsPage + 1))}
+                            disabled={departmentsPage === totalDepartmentPages}
+                            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                            aria-label="Next page"
+                          >
+                            <span>Next</span>
+                            <ChevronRight className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
               </section>
             </div>
