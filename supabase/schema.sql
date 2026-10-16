@@ -45,16 +45,7 @@ CREATE INDEX IF NOT EXISTS idx_jobs_work_arrangement ON public.jobs (work_arrang
 CREATE INDEX IF NOT EXISTS idx_jobs_published_at ON public.jobs (published_at DESC);
 CREATE INDEX IF NOT EXISTS idx_jobs_slug ON public.jobs (slug);
 
--- 3. Subscribers Table for Email / Web Push Alerts
-CREATE TABLE IF NOT EXISTS public.subscribers (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  email VARCHAR(255) UNIQUE,
-  endpoint TEXT,
-  categories TEXT[] DEFAULT '{}',
-  subscribed_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- 4. Audit Logs Table (Immutable governance log)
+-- 3. Audit Logs Table (Immutable governance log)
 CREATE TABLE IF NOT EXISTS public.audit_logs (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   admin_id VARCHAR(100) NOT NULL,
@@ -65,9 +56,8 @@ CREATE TABLE IF NOT EXISTS public.audit_logs (
   timestamp TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 5. Row Level Security (RLS)
+-- 4. Row Level Security (RLS)
 ALTER TABLE public.jobs ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.subscribers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.audit_logs ENABLE ROW LEVEL SECURITY;
 
 -- Allow public read access to published and archived jobs.
@@ -75,12 +65,6 @@ CREATE POLICY "Public users can view published jobs"
   ON public.jobs
   FOR SELECT
   USING (status IN ('published', 'archived'));
-
--- Allow anon subscriber inserts
-CREATE POLICY "Public users can subscribe to alerts"
-  ON public.subscribers
-  FOR INSERT
-  WITH CHECK (true);
 
 -- Allow authenticated admins full access
 CREATE POLICY "Authenticated users can manage jobs"
@@ -90,25 +74,17 @@ CREATE POLICY "Authenticated users can manage jobs"
   USING (true)
   WITH CHECK (true);
 
-CREATE POLICY "Authenticated users can view audit logs"
-  ON public.audit_logs
-  FOR ALL
-  TO authenticated
-  USING (true)
-  WITH CHECK (true);
+-- Audit logs are not directly accessible to client roles.
+REVOKE ALL ON TABLE public.audit_logs FROM PUBLIC, anon, authenticated;
 
--- 6. Supabase Storage Egress Bucket Setup
+-- 5. Supabase Storage Egress Bucket Setup
 -- Bucket name: ap-northeast-1
 INSERT INTO storage.buckets (id, name, public)
 VALUES ('ap-northeast-1', 'ap-northeast-1', true)
 ON CONFLICT (id) DO NOTHING;
 
--- Storage public read policy
-CREATE POLICY "Public can view ap-northeast-1 bucket items"
-  ON storage.objects FOR SELECT
-  USING (bucket_id = 'ap-northeast-1');
-
 -- Storage upload policy
-CREATE POLICY "Authenticated or Anon uploads to ap-northeast-1 bucket"
+CREATE POLICY "Authenticated uploads to ap-northeast-1 bucket"
   ON storage.objects FOR INSERT
+  TO authenticated
   WITH CHECK (bucket_id = 'ap-northeast-1');

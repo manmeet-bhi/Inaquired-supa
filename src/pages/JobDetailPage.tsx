@@ -75,14 +75,15 @@ export const JobDetailPage: React.FC<JobDetailPageProps> = ({ slug, jobs, onNavi
   const job = jobs.find((j) => j.slug === slug || j.id === slug);
   const isArchived = job?.status === 'archived';
 
-  // Filter 7-8 related jobs from the same department/category
-  const sameDeptJobs = job ? jobs.filter(
-    (j) => j.id !== job.id && (j.status === 'published' || !j.status) && j.category === job.category
-  ) : [];
-  const otherDeptJobs = job ? jobs.filter(
-    (j) => j.id !== job.id && (j.status === 'published' || !j.status) && j.category !== job.category
-  ) : [];
-  const relatedJobs = [...sameDeptJobs, ...otherDeptJobs].slice(0, 8);
+  const jobCategory = job?.category?.trim().toLocaleLowerCase();
+  const relatedJobs = jobCategory
+    ? jobs.filter(
+        (relatedJob) =>
+          relatedJob.id !== job?.id &&
+          (relatedJob.status === 'published' || !relatedJob.status) &&
+          relatedJob.category?.trim().toLocaleLowerCase() === jobCategory
+      ).slice(0, 8)
+    : [];
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -281,7 +282,7 @@ export const JobDetailPage: React.FC<JobDetailPageProps> = ({ slug, jobs, onNavi
               className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 transition-colors"
             >
               <Share2 className="h-3.5 w-3.5" />
-              <span>{copied ? 'Link Copied!' : 'Share Listing'}</span>
+              <span>{copied ? 'Link Copied!' : 'Share'}</span>
             </button>
           </div>
         </div>
@@ -353,7 +354,7 @@ export const JobDetailPage: React.FC<JobDetailPageProps> = ({ slug, jobs, onNavi
               <div>
                 <span className="text-slate-500 dark:text-slate-400 block text-xs">Application Deadline</span>
                 <span className="font-semibold text-slate-900 dark:text-white">
-                  {job.applicationDeadline || 'Open until filled'}
+                  {job.applicationDeadline || 'Not specified'}
                 </span>
               </div>
             </div>
@@ -383,7 +384,10 @@ export const JobDetailPage: React.FC<JobDetailPageProps> = ({ slug, jobs, onNavi
                     type="button"
                     onClick={() => {
                       onNavigate(`/jobs/${relJob.slug || relJob.id}`);
-                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                      window.scrollTo({
+                        top: 0,
+                        behavior: window.matchMedia('(max-width: 639px)').matches ? 'auto' : 'smooth',
+                      });
                     }}
                     className="w-full text-left group rounded-xl p-3 border border-slate-100 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-950/40 hover:bg-white dark:hover:bg-slate-800/60 hover:border-indigo-300 dark:hover:border-indigo-700/60 hover:shadow-xs transition-all cursor-pointer block"
                   >

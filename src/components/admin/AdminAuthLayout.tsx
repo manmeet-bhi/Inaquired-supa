@@ -62,11 +62,6 @@ export const AdminAuthLayout: React.FC<AdminAuthLayoutProps> = ({
       isDark ? 'text-slate-400' : 'text-slate-500'
     }`}>
       <span>Inaquired admin</span>
-      <nav aria-label="Footer" className="flex items-center gap-3 sm:gap-5">
-        <a href="/contact" className={isDark ? 'hover:text-white' : 'hover:text-slate-900'}>Help</a>
-        <a href="/privacy" className={isDark ? 'hover:text-white' : 'hover:text-slate-900'}>Privacy</a>
-        <a href="/terms" className={isDark ? 'hover:text-white' : 'hover:text-slate-900'}>Terms</a>
-      </nav>
     </footer>
   </main>
   );

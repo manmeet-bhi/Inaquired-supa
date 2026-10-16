@@ -1,4 +1,3 @@
-import { supabase } from '../lib/supabase';
 import { Job } from '../types/job';
 
 const LOCAL_STORAGE_NOTIFICATION_KEY = 'inaquired_notifications_enabled';
@@ -30,21 +29,10 @@ export async function requestJobNotifications(): Promise<boolean> {
     const permission = await Notification.requestPermission();
     if (permission === 'granted') {
       localStorage.setItem(LOCAL_STORAGE_NOTIFICATION_KEY, 'true');
-      
-      // Register subscriber in Supabase
-      try {
-        await supabase.from('subscribers').insert({
-          endpoint: `browser_client_${navigator.userAgent.substring(0, 80)}`,
-          subscribed_at: new Date().toISOString(),
-          categories: ['all'],
-        });
-      } catch (err) {
-        console.warn('Note: subscriber record could not be saved to Supabase:', err);
-      }
 
       // Show welcome notification
       new Notification('inaquired Job Alerts Activated', {
-        body: 'You will receive immediate alerts whenever high-quality verified roles are published.',
+        body: 'Browser notifications are enabled. Keep inaquired open to receive new-opening alerts.',
         icon: '/favicon.ico',
       });
       return true;

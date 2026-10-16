@@ -391,28 +391,14 @@ export async function disable2Fa(
 ): Promise<{ success: boolean; error?: string }> {
   const cleanEmail = email.trim().toLowerCase();
 
-  // Attempt 1: Call API
   try {
     const res = await postApi('/api/auth/2fa/disable', { email: cleanEmail, method });
     if (res && res.success) {
       return res;
     }
+    return { success: false, error: res?.error || 'Failed to update 2FA configuration.' };
   } catch (err: any) {
-    console.warn('API /api/auth/2fa/disable notice:', err.message);
+    console.error('API /api/auth/2fa/disable failed:', err.message);
+    return { success: false, error: err.message || 'Failed to update 2FA configuration.' };
   }
-
-  // Attempt 2: Direct Supabase RPC fallback
-  try {
-    const { data, error } = await supabase.rpc('admin_disable_2fa', {
-      p_email: cleanEmail,
-      p_method: method,
-    });
-    if (!error && (data?.success || data === true)) {
-      return { success: true };
-    }
-  } catch (dbErr: any) {
-    console.warn('Direct Supabase disable 2FA fallback notice:', dbErr.message);
-  }
-
-  return { success: false, error: 'Failed to update 2FA configuration.' };
 }

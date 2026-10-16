@@ -122,9 +122,6 @@ export const HomePage: React.FC<HomePageProps> = ({
   }, [currentPage, totalPages]);
   
   // Quick spotlight sections
-  const remoteJobs = jobs
-    .filter((job) => job.workArrangement === 'remote' && job.featured)
-    .slice(0, 6);
   const internships = jobs.filter((j) => j.jobType === 'internship').slice(0, 3);
   const featuredJobs = jobs.filter((j) => j.featured).slice(0, 3);
   const defaultDepartmentTiles = [
@@ -344,27 +341,27 @@ export const HomePage: React.FC<HomePageProps> = ({
         )}
       </section>
 
-      {/* Featured Remote Section */}
-      {remoteJobs.length > 0 && (
+      {/* Featured Jobs Section */}
+      {featuredJobs.length > 0 && (
         <section className="border-t border-slate-200 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-900/30 py-12">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
               <div>
                 <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-                  Trending Remote Opportunities
+                  Featured Opportunities
                 </h2>
               </div>
               <button
-                onClick={() => onNavigate('/remote-jobs')}
+                onClick={() => onNavigate('/jobs')}
                 className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-700 dark:text-indigo-400"
               >
-                <span>View all remote positions</span>
+                <span>View all jobs</span>
                 <ArrowRight className="h-3.5 w-3.5" />
               </button>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-              {remoteJobs.map((job) => (
+              {featuredJobs.map((job) => (
                 <JobCard key={job.id} job={job} onClick={onSelectJob} />
               ))}
             </div>
