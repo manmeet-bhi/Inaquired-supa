@@ -1,7 +1,5 @@
 -- ==============================================================================
 -- inaquired Database Schema & Storage Configuration for Supabase
--- Target Postgres: db.wnpsrdtlqxfiglhmalwq.supabase.co:5432/postgres
--- Egress S3 Bucket: ap-northeast-1
 -- ==============================================================================
 
 -- 1. Enable UUID Extension
@@ -66,25 +64,15 @@ CREATE POLICY "Public users can view published jobs"
   FOR SELECT
   USING (status IN ('published', 'archived'));
 
--- Allow authenticated admins full access
-CREATE POLICY "Authenticated users can manage jobs"
-  ON public.jobs
-  FOR ALL
-  TO authenticated
-  USING (true)
-  WITH CHECK (true);
+-- Explicit table grants (Supabase Data API compliance)
+GRANT SELECT ON public.jobs TO anon, authenticated;
+GRANT ALL ON public.jobs TO service_role;
 
--- Audit logs are not directly accessible to client roles.
+-- Audit logs are strictly server-only
 REVOKE ALL ON TABLE public.audit_logs FROM PUBLIC, anon, authenticated;
+GRANT ALL ON TABLE public.audit_logs TO service_role;
 
 -- 5. Supabase Storage Egress Bucket Setup
--- Bucket name: ap-northeast-1
 INSERT INTO storage.buckets (id, name, public)
 VALUES ('ap-northeast-1', 'ap-northeast-1', true)
 ON CONFLICT (id) DO NOTHING;
-
--- Storage upload policy
-CREATE POLICY "Authenticated uploads to ap-northeast-1 bucket"
-  ON storage.objects FOR INSERT
-  TO authenticated
-  WITH CHECK (bucket_id = 'ap-northeast-1');
