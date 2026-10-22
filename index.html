@@ -28,6 +28,12 @@
         googleTagScript.async = true;
         googleTagScript.src = 'https://www.googletagmanager.com/gtag/js?id=G-QMZ0Q01STC';
         document.head.appendChild(googleTagScript);
+
+        var googleAdsScript = document.createElement('script');
+        googleAdsScript.async = true;
+        googleAdsScript.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6525398705991991';
+        googleAdsScript.crossOrigin = 'anonymous';
+        document.head.appendChild(googleAdsScript);
       }
     </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
