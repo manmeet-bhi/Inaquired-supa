@@ -90,7 +90,8 @@ app.use(express.static(distPath));
 
 // Fallback to index.html for SPA client-side routing
 app.get('*', (req, res) => {
-  res.sendFile(path.join(distPath, 'index.html'));
+  const htmlFile = req.path === '/admin' || req.path.startsWith('/admin/') ? 'admin.html' : 'index.html';
+  res.sendFile(path.join(distPath, htmlFile));
 });
 
 app.listen(PORT, '0.0.0.0', () => {

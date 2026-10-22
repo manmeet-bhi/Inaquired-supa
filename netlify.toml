@@ -19,6 +19,17 @@
   to = "/.netlify/functions/api/sitemap.xml"
   status = 200
 
+# Keep admin routes on a shell that does not include public-page ad scripts.
+[[redirects]]
+  from = "/admin"
+  to = "/admin.html"
+  status = 200
+
+[[redirects]]
+  from = "/admin/*"
+  to = "/admin.html"
+  status = 200
+
 # Handle client-side routing for Single Page Applications (SPA)
 [[redirects]]
   from = "/*"

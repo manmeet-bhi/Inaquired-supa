@@ -119,13 +119,13 @@ app.use(express.static(distPath, { index: false }));
 
 // Server-Side Metadata Pre-Rendering & HTML Fallback
 app.get('*', async (req, res) => {
-  const indexPath = path.join(distPath, 'index.html');
-  if (!fs.existsSync(indexPath)) {
+  const htmlPath = path.join(distPath, req.path === '/admin' || req.path.startsWith('/admin/') ? 'admin.html' : 'index.html');
+  if (!fs.existsSync(htmlPath)) {
     return res.status(404).send('Application build not found. Please run npm run build.');
   }
 
   try {
-    const rawHtml = fs.readFileSync(indexPath, 'utf-8');
+    const rawHtml = fs.readFileSync(htmlPath, 'utf-8');
     const origin = `${req.protocol}://${req.get('host') || 'inaquired.app'}`;
     const meta = await generateMetadata(req.path, origin);
     const renderedHtml = injectMetadataIntoHtml(rawHtml, meta);
@@ -133,7 +133,7 @@ app.get('*', async (req, res) => {
     res.status(meta.statusCode || 200).send(renderedHtml);
   } catch (err) {
     console.error('[Server SEO Engine] HTML injection error:', err);
-    res.sendFile(indexPath);
+    res.sendFile(htmlPath);
   }
 });
 

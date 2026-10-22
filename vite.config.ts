@@ -15,6 +15,10 @@ export default defineConfig(() => {
     build: {
       chunkSizeWarningLimit: 1500,
       rollupOptions: {
+        input: {
+          public: path.resolve(import.meta.dirname || '.', 'index.html'),
+          admin: path.resolve(import.meta.dirname || '.', 'admin.html'),
+        },
         output: {
           manualChunks(id) {
             if (id.includes('node_modules')) {
