@@ -87,6 +87,7 @@ export const STATIC_PUBLIC_ROUTES = [
   { path: '/', priority: '1.0', changefreq: 'daily' },
   { path: '/jobs', priority: '0.9', changefreq: 'daily' },
   { path: '/remote-jobs', priority: '0.8', changefreq: 'daily' },
+  { path: '/onsite-jobs', priority: '0.8', changefreq: 'daily' },
   { path: '/hybrid-jobs', priority: '0.8', changefreq: 'daily' },
   { path: '/internships', priority: '0.8', changefreq: 'daily' },
   { path: '/departments', priority: '0.8', changefreq: 'weekly' },

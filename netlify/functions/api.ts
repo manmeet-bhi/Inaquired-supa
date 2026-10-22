@@ -16,7 +16,7 @@ import {
   handleGetBackupCodes,
   handleDisable2Fa
 } from '../../src/server/twoFactorApiHandlers.ts';
-import { handleSeoSummary } from '../../src/server/seoHandlers.ts';
+import { handleSeoSummary, handleSitemapXml } from '../../src/server/seoHandlers.ts';
 import { handlePublicJobs } from '../../src/server/publicJobsHandler.ts';
 
 export const handler = async (event: any, context: any) => {
@@ -119,6 +119,8 @@ export const handler = async (event: any, context: any) => {
       await handleResetPassword(req, res);
     } else if (rawPath === '/api/seo/summary' && event.httpMethod === 'GET') {
       await handleSeoSummary(req, res);
+    } else if (rawPath === '/api/sitemap.xml' && (event.httpMethod === 'GET' || event.httpMethod === 'HEAD')) {
+      await handleSitemapXml(req, res);
     } else if (rawPath === '/api/public/jobs' && event.httpMethod === 'GET') {
       await handlePublicJobs(req, res);
     } else if (rawPath === '/api/auth/health' && event.httpMethod === 'GET') {

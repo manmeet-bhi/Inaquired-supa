@@ -13,6 +13,12 @@
   to = "/.netlify/functions/api/:splat"
   status = 200
 
+# Serve the generated XML sitemap through the API function.
+[[redirects]]
+  from = "/sitemap.xml"
+  to = "/.netlify/functions/api/sitemap.xml"
+  status = 200
+
 # Handle client-side routing for Single Page Applications (SPA)
 [[redirects]]
   from = "/*"
