@@ -119,7 +119,7 @@ export const handler = async (event: any, context: any) => {
       await handleResetPassword(req, res);
     } else if (rawPath === '/api/seo/summary' && event.httpMethod === 'GET') {
       await handleSeoSummary(req, res);
-    } else if (rawPath === '/api/sitemap.xml' && (event.httpMethod === 'GET' || event.httpMethod === 'HEAD')) {
+    } else if ((rawPath === '/api/sitemap.xml' || rawPath === '/sitemap.xml') && (event.httpMethod === 'GET' || event.httpMethod === 'HEAD')) {
       await handleSitemapXml(req, res);
     } else if (rawPath === '/api/public/jobs' && event.httpMethod === 'GET') {
       await handlePublicJobs(req, res);
