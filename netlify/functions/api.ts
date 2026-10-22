@@ -53,8 +53,10 @@ export const handler = async (event: any, context: any) => {
     set statusCode(code: number) { statusCode = code; },
     setHeader(key: string, val: string) { headers[key] = val; },
     getHeader(key: string) { return headers[key]; },
-    end(data?: string) {
-      if (data) body = data;
+    end(data?: string | Buffer) {
+      if (data !== undefined) {
+        body = Buffer.isBuffer(data) ? data.toString('utf8') : data;
+      }
     },
     json(data: any) {
       body = JSON.stringify(data);
