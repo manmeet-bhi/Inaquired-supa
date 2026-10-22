@@ -93,6 +93,10 @@ function MainApp() {
 
   const navigate = (path: string) => {
     if (path !== currentPath) {
+      if (path.startsWith('/admin') !== currentPath.startsWith('/admin')) {
+        window.location.assign(path);
+        return;
+      }
       window.history.pushState({}, '', path);
       setCurrentPath(path);
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -101,11 +105,16 @@ function MainApp() {
 
   useEffect(() => {
     const handlePopState = () => {
-      setCurrentPath(window.location.pathname || '/');
+      const nextPath = window.location.pathname || '/';
+      if (nextPath.startsWith('/admin') !== currentPath.startsWith('/admin')) {
+        window.location.reload();
+        return;
+      }
+      setCurrentPath(nextPath);
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, []);
+  }, [currentPath]);
 
   useEffect(() => subscribeToCategories(setCategories), []);
 
